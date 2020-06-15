@@ -12,7 +12,6 @@ inbox = require "inbox"
 
 -- set up broad-ranging game data
 game_status = {
-	action = nil,
 	menu = nil,
 	threshhold = 144,
 	points = 0,
@@ -46,30 +45,29 @@ player = {
 	medium_speed = 150,
 	high_speed = 180,
 	alive = false,
+	lives = 3,
 	appearance = {
 		small_sprite = nil,
 		medium_sprite = nil,
 		large_sprite = nil
 	},
 	projectile_speed = 240,
-	projectile_sprite = nil,
+	slow_projectile_speed = 210,
+	small_projectile_sprite = nil,
+	large_projectile_sprite = nil,
 	projectile_timer = 0,
-	projectiles = {}
+	small_projectiles = {},
+	large_projectiles = {}
 }
-
-player.projectiles[1] = { x = -100, y = 100 }
-player.projectiles[2] = { x = -100, y = 100 }
-player.projectiles[3] = { x = -100, y = 100 }
-player.projectiles[4] = { x = -100, y = 100 }
-player.projectiles[5] = { x = -100, y = 100 }
 
 -- set up data for game controls
 controls = {
 	kbd = {
 		bindings = {
 			pause = "escape",
-			ability = "x",
 			main_attack = "c",
+			form_up = "x",
+			form_down = "z",
 			up = "up",
 			down = "down",
 			left = "left",
@@ -78,8 +76,9 @@ controls = {
 		},
 		modifier = {
 			pause = true,
-			ability = false,
 			main_attack = false,
+			form_up = false,
+			form_down = false,
 			up = true,
 			down = true,
 			left = true,
@@ -89,8 +88,9 @@ controls = {
 	},
 	cnt = {
 		pause = "start",
-		ability = "a",
-		main_attack = "x",
+		main_attack = "a",
+		form_up = "x",
+		form_down = "b",
 		up = "dpup",
 		down = "dpdown",
 		left = "dpleft",
@@ -114,7 +114,6 @@ controls = {
 	},
 	quick_detect = {
 		pause = 0,
-		ability = 0,
 		main_attack = 0,
 		up = 0,
 		down = 0,
@@ -146,12 +145,16 @@ map = {
 			image = nil,
 			quad = nil,
 			speed = 3.4,
+			spawn_group = spawn.star_group,
+			spawn_stars = spawn.stars,
 			groups = {}
 		},
 		far_stars = {
 			image = nil,
 			quad = nil,
 			speed = 2,
+			spawn_group = spawn.star_group,
+			spawn_stars = spawn.stars,
 			groups = {}
 		}
 	},
@@ -160,7 +163,11 @@ map = {
 
 enemies = {
 	spawn_timer = 7,
+	spawn_latch = 2.70,
 	attack_timer = 8.5,
+	attack_latch = 1.35,
+	weight_point = love.graphics.getHeight() / 2,
+	weight_wait = 12,
 	basic = {
 		sprite = nil,
 		locations = {},
@@ -180,7 +187,6 @@ function love.focus(focused_on_game)
 	
 	if not focused_on_game and game_status.menu == "none" then
 		-- pause the game if the player switches away from it and it's not already paused
-		game_status.action = "pause"
 		if game_status.menu == "none" or game_status.menu == "pause" then
 			game_status.menu = "pause"
 		end
@@ -196,26 +202,34 @@ function love.mousemoved(x, y, dx, dy)
 	end
 end
 
+function love.mousepressed(x, y, button)
+	if game_status.menu == "game_over" then
+		game_status.menu = "pause"
+	end
+end
+
 function love.wheelmoved(x, y)
-	if y > 0 then
-		if player.form == "small" then
-			player.form = "medium"
-			player.height = player.medium_height
-			player.y = player.y - ((player.medium_height - player.small_height) / 2)
-		elseif player.form == "medium" then
-			player.form = "large"
-			player.height = player.large_height
-			player.y = player.y - ((player.large_height - player.medium_height) / 2)
-		end
-	elseif y < 0 then
-		if player.form == "large" then
-			player.form = "medium"
-			player.height = player.medium_height
-			player.y = player.y + ((player.large_height - player.medium_height) / 2)
-		elseif player.form == "medium" then
-			player.form = "small"
-			player.height = player.small_height
-			player.y = player.y + ((player.medium_height - player.small_height) / 2)
+	if player.alive and not player.hurt then
+		if y > 0 then
+			if player.form == "small" then
+				player.form = "medium"
+				player.height = player.medium_height
+				player.y = player.y - ((player.medium_height - player.small_height) / 2)
+			elseif player.form == "medium" then
+				player.form = "large"
+				player.height = player.large_height
+				player.y = player.y - ((player.large_height - player.medium_height) / 2)
+			end
+		elseif y < 0 then
+			if player.form == "large" then
+				player.form = "medium"
+				player.height = player.medium_height
+				player.y = player.y + ((player.large_height - player.medium_height) / 2)
+			elseif player.form == "medium" then
+				player.form = "small"
+				player.height = player.small_height
+				player.y = player.y + ((player.medium_height - player.small_height) / 2)
+			end
 		end
 	end
 end
@@ -226,7 +240,6 @@ function love.quit()
 		-- don't quit
 		game_status.input_type = nil
 		game_status.selected_item = 1
-		game_status.action = "pause"
 		game_status.menu = "quit_check"
 		return true
 	elseif game_status.menu == "quit_confirmed" then
@@ -248,9 +261,7 @@ function love.load(arg)
 	player.width = player.appearance.small_sprite:getWidth()
 	player.height = player.appearance.small_sprite:getHeight()
 	
-	love.graphics.setBackgroundColor(240, 240, 240)
-	
-	game_status.debug_text = "Welcome to Negative Space!"
+	love.graphics.setBackgroundColor(236, 240, 236)
 	
 	love.mouse.setRelativeMode(true)
 	
@@ -260,7 +271,6 @@ function love.load(arg)
 	player.height = player.small_height
 	
 	game_status.menu = "pause"
-	game_status.action = "pause"
 end -- love.load
 
 
@@ -272,14 +282,11 @@ function love.update(dt)
 	temp_window_position.x, temp_window_position.y, temp_window_position.display = love.window.getPosition()
 	if game_status.window_position.x ~= temp_window_position.x or game_status.window_position.y ~= temp_window_position.y or game_status.window_position.display ~= temp_window_position.display then
 		-- the game window is being moved, pause the game for player safety and game state integrity
-		if game_status.action == "play" then
-			game_status.action = "pause"
-			if game_status.menu == "none" then
-				game_status.menu = "pause"
-			end
-			game_status.input_type = nil
-			game_status.window_position.x, game_status.window_position.y, game_status.window_position.display = love.window.getPosition()
+		if game_status.menu == "none" then
+			game_status.menu = "pause"
 		end
+		game_status.input_type = nil
+		game_status.window_position.x, game_status.window_position.y, game_status.window_position.display = love.window.getPosition()
 	end
 	
 	-- get the controls being pressed right now
@@ -357,10 +364,6 @@ function love.update(dt)
 			elseif selected_enemy.vertical_direction == "down" then
 				selected_enemy.y = selected_enemy.y + selected_enemy.speed * dt
 			end
-			if selected_enemy.horizontal_direction == "sine" and selected_enemy.vertical_direction == "sine" then
-				selected_enemy.x = selected_enemy.x - selected_enemy.speed * dt
-				selected_enemy.y = math.sin(selected_enemy.x * love.graphics.getHeight()) + (love.graphics.getHeight() / 2)
-			end
 			
 			-- check for collisions with the player
 			if not player.hurt then
@@ -380,14 +383,43 @@ function love.update(dt)
 			end
 			
 			-- check for player projectiles hitting an enemy
-			for projectile_index, selected_projectile in pairs(player.projectiles) do
-				if shc.check_collision(selected_projectile.x, selected_projectile.y, player.projectile_sprite:getWidth(), player.projectile_sprite:getHeight(), selected_enemy.x, selected_enemy.y, selected_enemy.width, selected_enemy.height, "right") then
-					-- the enemy was hit, despawn it and reset the projectile
+			for projectile_index, selected_projectile in pairs(player.small_projectiles) do
+				if shc.check_collision(selected_projectile.x, selected_projectile.y, player.small_projectile_sprite:getWidth(), player.small_projectile_sprite:getHeight(), selected_enemy.x, selected_enemy.y, selected_enemy.width, selected_enemy.height, "full") then
+					-- despawn the enemy
 					enemies.basic.locations[enemy_index] = enemies.basic.locations[#enemies.basic.locations]
 					enemies.basic.locations[#enemies.basic.locations] = nil
-					player.projectile_timer = 0
-					spawn.explosion(selected_projectile.x + player.projectile_sprite:getWidth(), selected_projectile.y + (player.projectile_sprite:getHeight() / 2), 7, 17)
-					selected_projectile.x = -100
+					if player.form ~= "large" then
+						player.projectile_timer = 0.001
+					end
+					-- make an explosion
+					spawn.explosion(selected_projectile.x + player.small_projectile_sprite:getWidth(), selected_projectile.y + (player.small_projectile_sprite:getHeight() / 2), 7, 14)
+					-- add points
+					added_points = added_points + 20
+					if selected_enemy.vertical_direction ~= "none" then
+						added_points = added_points + 10
+					end
+					if selected_enemy.horizontal_direction == "right" then
+						added_points = added_points + 10
+					end
+					-- get rid of the projectile
+					table.remove(player.small_projectiles, projectile_index)
+				end
+			end
+			
+			for projectile_index, selected_projectile in pairs(player.large_projectiles) do
+				if shc.check_collision(selected_projectile.x, selected_projectile.y, player.large_projectile_sprite:getWidth(), player.large_projectile_sprite:getHeight(), selected_enemy.x, selected_enemy.y, selected_enemy.width, selected_enemy.height, "full") then
+					-- despawn the enemy
+					enemies.basic.locations[enemy_index] = enemies.basic.locations[#enemies.basic.locations]
+					enemies.basic.locations[#enemies.basic.locations] = nil
+					spawn.explosion(selected_projectile.x + player.large_projectile_sprite:getWidth(), selected_projectile.y + (player.large_projectile_sprite:getHeight() / 2), 7, 14)
+					-- add points
+					added_points = added_points + 20
+					if selected_enemy.vertical_direction ~= "none" then
+						added_points = added_points + 10
+					end
+					if selected_enemy.horizontal_direction == "right" then
+						added_points = added_points + 10
+					end
 				end
 			end
 		end
@@ -409,13 +441,25 @@ function love.update(dt)
 			end
 			
 			-- check for player projectiles hitting an enemy projectile
-			for player_projectile_index, selected_player_projectile in pairs(player.projectiles) do
-				if shc.check_collision(selected_projectile.x, selected_projectile.y, enemies.basic.projectiles.width, enemies.basic.projectiles.height, selected_player_projectile.x, selected_player_projectile.y, player.projectile_sprite:getWidth(), player.projectile_sprite:getHeight(), "right") then
+			for player_projectile_index, selected_player_projectile in pairs(player.small_projectiles) do
+				if shc.check_collision(selected_projectile.x, selected_projectile.y, enemies.basic.projectiles.width, enemies.basic.projectiles.height, selected_player_projectile.x, selected_player_projectile.y, player.small_projectile_sprite:getWidth(), player.small_projectile_sprite:getHeight(), "full") then
 					-- the player hit an enemy projectile with their own, remove both
+					if player.form ~= "large" then
+						player.projectile_timer = 0.001
+					end
+					spawn.explosion(selected_player_projectile.x + player.small_projectile_sprite:getWidth(), selected_player_projectile.y + (player.small_projectile_sprite:getHeight() / 2), 4, 9)
+					added_points = added_points + 10
 					table.remove(enemies.basic.projectiles.locations, projectile_index)
-					player.projectile_timer = 0
-					spawn.explosion(selected_player_projectile.x + player.projectile_sprite:getWidth(), selected_player_projectile.y + (player.projectile_sprite:getHeight() / 2), 4, 11)
-					selected_player_projectile.x = -100
+					table.remove(player.small_projectiles, projectile_index)
+				end
+			end
+			
+			for player_projectile_index, selected_player_projectile in pairs(player.large_projectiles) do
+				if shc.check_collision(selected_projectile.x, selected_projectile.y, enemies.basic.projectiles.width, enemies.basic.projectiles.height, selected_player_projectile.x, selected_player_projectile.y, player.large_projectile_sprite:getWidth(), player.large_projectile_sprite:getHeight(), "full") then
+					-- the player hit an enemy projectile with their own
+					spawn.explosion(selected_player_projectile.x + player.large_projectile_sprite:getWidth(), selected_player_projectile.y + (player.large_projectile_sprite:getHeight() / 2), 4, 9)
+					added_points = added_points + 10
+					table.remove(enemies.basic.projectiles.locations, projectile_index)
 				end
 			end
 			
@@ -426,11 +470,19 @@ function love.update(dt)
 		end
 		
 		-- manage player projectiles
-		for projectile_index, selected_projectile in pairs(player.projectiles) do
+		for projectile_index, selected_projectile in pairs(player.small_projectiles) do
 			if selected_projectile.x >= love.graphics.getWidth() then
-				selected_projectile.x = -100
+				table.remove(player.small_projectiles, projectile_index)
 			elseif selected_projectile.x > 0 and selected_projectile.x < love.graphics.getWidth() then
 				selected_projectile.x = selected_projectile.x + (player.projectile_speed * dt)
+			end
+		end
+		
+		for projectile_index, selected_projectile in pairs(player.large_projectiles) do
+			if selected_projectile.x >= love.graphics.getWidth() then
+				table.remove(player.large_projectiles, projectile_index)
+			elseif selected_projectile.x > 0 and selected_projectile.x < love.graphics.getWidth() then
+				selected_projectile.x = selected_projectile.x + (player.slow_projectile_speed * dt)
 			end
 		end
 		
@@ -439,12 +491,16 @@ function love.update(dt)
 		-- manage explosions
 		for explosion_index, selected_explosion in pairs(map.explosions) do
 			if selected_explosion.switch == "explode" then
-				selected_explosion.size = selected_explosion.size + (dt * 20)
+				selected_explosion.size = selected_explosion.size + (dt * selected_explosion.speed)
+				selected_explosion.first_ring_size = selected_explosion.size + 2
+				selected_explosion.second_ring_size = selected_explosion.first_ring_size + 3
 				if selected_explosion.size > selected_explosion.MAX_EXPLOSION then
 					selected_explosion.switch = "implode"
 				end
 			elseif selected_explosion.switch == "implode" then
-				selected_explosion.size = selected_explosion.size - (dt * 20)
+				selected_explosion.size = selected_explosion.size - (dt * selected_explosion.speed)
+				selected_explosion.first_ring_size = selected_explosion.first_ring_size + (dt * selected_explosion.speed * 0.7)
+				selected_explosion.second_ring_size = selected_explosion.second_ring_size + (dt * selected_explosion.speed * 0.5)
 				if selected_explosion.size <= 2 then
 					table.remove(map.explosions, explosion_index)
 				end
@@ -493,8 +549,12 @@ function love.update(dt)
 				player.projectile_timer = 0
 			end
 			
-			if quick_detect.main_attack ~= 0 then
-				spawn.player_projectile(player.x + player.width, player.y + (player.height / 2) - (player.projectile_sprite:getHeight() / 2))
+			if quick_detect.main_attack < 0 then
+				if player.form == "small" or player.form == "medium" then
+					spawn.player_projectile(player.x + player.width, player.y + (player.height / 2) - (player.small_projectile_sprite:getHeight() / 2))
+				elseif player.form == "large" then
+					spawn.player_projectile(player.x + player.width, player.y + (player.height / 2) - (player.large_projectile_sprite:getHeight() / 2))
+				end
 			end
 			
 			-- manage player health and death
@@ -504,22 +564,49 @@ function love.update(dt)
 			end
 		elseif not player.alive then
 			-- the player is dead
-			player.spawn_timer = player.spawn_timer - dt
-			if player.spawn_timer <= 0 then
-				player.spawn_timer = 0
-				player.flinch_timer = 0
-				spawn.player(0, 235)
+			if player.lives > 0 then
+				player.spawn_timer = player.spawn_timer - dt
+				if player.spawn_timer <= 0 then
+					player.spawn_timer = 0
+					player.flinch_timer = 0
+					player.lives = player.lives - 1
+					spawn.player(0, 235)
+				end
+			elseif player.lives <= 0 then
+				-- game over
+				game_status.menu = "game_over"
+				enemies.basic.locations = {}
+				enemies.basic.projectiles.locations = {}
+				enemies.spawn_timer = 7
+				enemies.spawn_latch = 2.70
+				enemies.attack_timer = 8.5
+				enemies.attack_latch = 1.35
+				enemies.weight_wait = 12
+				map.explosions = {}
+				game_status.points = 0
+				player.small_projectiles = {}
+				player.large_projectiles = {}
+				player.lives = 3
+				spawn.player(0, love.graphics.getHeight() / 2)
 			end
 		end
 		
 		if enemies.spawn_timer > 0 then
 			enemies.spawn_timer = enemies.spawn_timer - dt
+			enemies.weight_wait = enemies.weight_wait - dt
 		elseif enemies.spawn_timer <= 0 then
 			-- spawn a new enemy
 			local rand_x = util.weighted_random(750, 950, 880)
-			local rand_y = util.weighted_random(50, 450, 250)
+			local rand_y = util.weighted_random(30, 470, enemies.weight_point)
 			spawn.enemy("standard", 31, 31, rand_x, rand_y, "random", "random", 100, 1)
-			enemies.spawn_timer = 2.70
+			enemies.spawn_timer = enemies.spawn_latch
+			if enemies.spawn_latch > 0.4 then
+				enemies.spawn_latch = enemies.spawn_latch - (dt * 4)
+			end
+			enemies.weight_wait = enemies.weight_wait - dt
+			if enemies.weight_wait <= 0 then
+				enemies.weight_point = love.math.random(30, 470)
+			end
 		end
 		
 		if enemies.attack_timer > 0 then
@@ -533,12 +620,15 @@ function love.update(dt)
 					y = enemies.basic.locations[rand_enemy].y
 				})
 			end
-			enemies.attack_timer = 1.35
+			enemies.attack_timer = enemies.attack_latch
+			if enemies.attack_latch > 0.175 then
+				enemies.attack_latch = enemies.attack_latch - (dt * 2.75)
+			end
 		end
 		
 		-- spawn stars
-		spawn.stars("near", 1, 5)
-		spawn.stars("far", 1, 10)
+		map.stars.near_stars:spawn_stars(1, 5)
+		map.stars.far_stars:spawn_stars(1, 3)
 		
 		for type_index, selected_type in pairs(map.stars) do
 			local all_stale = true
@@ -547,15 +637,7 @@ function love.update(dt)
 				for star_index, selected_star in pairs(selected_group.locations) do
 					-- move the stars in this group
 					selected_star.x = selected_star.x - selected_type.speed
-					if selected_star.star_type == "none" then
-						selected_group.sprite_batch:set(selected_star.index, selected_type.quad, selected_star.x, selected_star.y)
-					elseif selected_star.star_type == "a" then
-						selected_group.sprite_batch:set(selected_star.index, selected_type.quad_a, selected_star.x, selected_star.y)
-					elseif selected_star.star_type == "b" then
-						selected_group.sprite_batch:set(selected_star.index, selected_type.quad_b, selected_star.x, selected_star.y)
-					elseif selected_star.star_type == "c" then
-						selected_group.sprite_batch:set(selected_star.index, selected_type.quad_c, selected_star.x, selected_star.y)
-					end
+					selected_group.sprite_batch:set(selected_star.index, selected_type.quad, selected_star.x, selected_star.y)
 					if selected_group.sprite_batch:getCount() > 950 then
 						-- this group is full, stop adding to it
 						selected_group.stale = true
@@ -573,20 +655,18 @@ function love.update(dt)
 			end
 			if all_stale then
 				-- create new star groups as all existing groups are full
-				spawn.star_group(selected_type)
+				selected_type:spawn_group()
 			end
 		end
 		
 		for type_index, selected_type in pairs(map.stars) do
 			for group_index, selected_group in pairs(selected_type.groups) do
 				if selected_group.alive == false then
+					-- delete invisible star groups
 					selected_type[group_index] = nil
 				end
 			end
 		end
-	elseif game_status.menu == "pause" then
-		-- the game is paused
-		
 	end
 end -- love.update
 
@@ -633,41 +713,67 @@ function love.draw()
 		love.graphics.draw(enemies.basic.projectiles.sprite, selected_projectile.x, selected_projectile.y)
 	end
 	
-	for projectile_index, selected_projectile in pairs(player.projectiles) do
-		love.graphics.draw(player.projectile_sprite, selected_projectile.x, selected_projectile.y)
+	for projectile_index, selected_projectile in pairs(player.small_projectiles) do
+		love.graphics.draw(player.small_projectile_sprite, selected_projectile.x, selected_projectile.y)
+	end
+	
+	for projectile_index, selected_projectile in pairs(player.large_projectiles) do
+		love.graphics.draw(player.large_projectile_sprite, selected_projectile.x, selected_projectile.y)
 	end
 	
 	-- show explosions
 	love.graphics.setColor(4, 16, 8)
 	for explosion_index, selected_explosion in pairs(map.explosions) do
 		love.graphics.circle("fill", selected_explosion.x, selected_explosion.y, selected_explosion.size)
+		love.graphics.circle("line", selected_explosion.x, selected_explosion.y, selected_explosion.first_ring_size)
+		love.graphics.circle("line", selected_explosion.x, selected_explosion.y, selected_explosion.second_ring_size)
 	end
 	love.graphics.setColor(255, 255, 255)
 	
 	-- draw UI
 	love.graphics.setFont(game_status.interface_font)
-	love.graphics.setColor(32, 192, 16)
-	love.graphics.printf("POINTS: " .. tostring(game_status.points), 0, 12, love.graphics.getWidth(), "center")
+	love.graphics.setColor(32, 224, 16)
+	local hearts = ""
+	if player.health == 3 then
+		hearts = "❤︎❤︎❤︎"
+	elseif player.health == 2 then
+		hearts = "❤︎❤︎  "
+	elseif player.health == 1 then
+		hearts = "❤︎    "
+	elseif player.health == 0 then
+		hearts = "      "
+	end
+	love.graphics.printf("HEALTH: " .. hearts .. "   LIVES: " .. tostring(player.lives), 0, 12, love.graphics.getWidth(), "center")
+	love.graphics.printf("POINTS: " .. tostring(game_status.points), 0, 26, love.graphics.getWidth(), "center")
 	
 	love.graphics.setFont(game_status.menu_font)
 	if game_status.menu == "pause" then
 		-- draw pause UI
 		love.graphics.setColor(4, 16, 8)
 		love.graphics.rectangle("fill", love.graphics.getWidth() * 3/8, 175, love.graphics.getWidth() / 4, 150)
-		love.graphics.setColor(32, 192, 16)
+		love.graphics.setColor(32, 224, 16)
 		love.graphics.printf("PAUSE", 0, 240, love.graphics.getWidth(), "center")
 		love.graphics.printf("X TO QUIT", 0, 264, love.graphics.getWidth(), "center")
 	elseif game_status.menu == "quit_check" then
 		love.graphics.setColor(4, 16, 8)
 		love.graphics.rectangle("fill", love.graphics.getWidth() * 3/8, 175, love.graphics.getWidth() / 4, 150)
-		love.graphics.setColor(32, 192, 16)
+		love.graphics.setColor(32, 224, 16)
 		love.graphics.printf("REALLY QUIT?", 0, 240, love.graphics.getWidth(), "center")
 		love.graphics.printf("X TO QUIT", 0, 264, love.graphics.getWidth(), "center")
 	elseif game_status.menu == "debug" then
 		love.graphics.setColor(4, 16, 8)
 		love.graphics.rectangle("fill", love.graphics.getWidth() * 3/8, 175, love.graphics.getWidth() / 4, 150)
-		love.graphics.setColor(32, 192, 16)
+		love.graphics.setColor(32, 224, 16)
 		love.graphics.printf("DEBUG", 0, 240, love.graphics.getWidth(), "center")
-		love.graphics.printf("kill Player - take Health - Give health - kill Enemies - console Info - Reset powerups - Full health - resurrecT player - console Debug", love.graphics.getWidth() * 3/8, 264, love.graphics.getWidth() / 4, "center")
+		love.graphics.printf("kill Player - take Health - Give health - kill Enemies - Full health - resurrecT player - console Debug", love.graphics.getWidth() * 3/8, 264, love.graphics.getWidth() / 4, "center")
+	elseif game_status.menu == "game_over" then
+		-- draw pause UI
+		love.graphics.setColor(4, 16, 8)
+		love.graphics.rectangle("fill", love.graphics.getWidth() * 3/8, 175, love.graphics.getWidth() / 4, 150)
+		love.graphics.setColor(32, 224, 16)
+		love.graphics.printf("GAME OVER", 0, 240, love.graphics.getWidth(), "center")
 	end
 end -- love.draw
+
+-- this code copyright 2020 by GV (WPA) and licensed only under Apache License Version 2.0
+-- cf https://www.apache.org/licenses/LICENSE-2.0

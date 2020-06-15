@@ -11,34 +11,24 @@ function spawn.player(x, y)
 	player.hurt = false
 	player.flinch_timer = 0
 	player.health = player.max_health
+	player.form = "small"
+	player.projectile_timer = 0
 	player.alive = true
-	
-	-- debugging help
-	if game_status.debug_messages then
-		print(string.format("Player spawned at: %.3f, %.3f", player.x, player.y))
-		game_status.debug_text = string.format("Player spawned at: %.3f, %.3f", player.x, player.y)
-	end
 end -- spawn.player
 
 function spawn.player_projectile(x, y)
 	-- create player-originated projectiles
 	
 	if player.projectile_timer == 0 then
-		for projectile_index, selected_projectile in pairs(player.projectiles) do
-			-- create a new projectile
-			if selected_projectile.x <= -99 then
-				selected_projectile.x = x
-				selected_projectile.y = y
-				player.projectile_timer = 0.800
-				
-				-- debugging help
-				if game_status.debug_messages then
-					print(string.format("Player projectile spawned at: %.3f, %.3f", selected_projectile.x, selected_projectile.y))
-					game_status.debug_text = string.format("Player projectile spawned at: %.3f, %.3f", selected_projectile.x, selected_projectile.y)
-				end
-				
-				break
-			end
+		player.projectile_timer = 0.800		
+		-- create a new projectile
+		if player.form == "small" then
+			table.insert(player.small_projectiles, {x = x, y = y})
+		elseif player.form == "medium" then
+			table.insert(player.small_projectiles, {x = x - 17, y = y - 17})
+			table.insert(player.small_projectiles, {x = x - 17, y = y + 17})
+		elseif player.form == "large" then
+			table.insert(player.large_projectiles, {x = x, y = y})
 		end
 	end
 end -- spawn.player_projectile
@@ -122,31 +112,24 @@ function spawn.enemy(type, width, height, origin_x, origin_y, horizontal_directi
 	end
 end -- spawn.enemy
 
-function spawn.star_group(type)
+function spawn:star_group()
 	-- create a new star group
 	
 	local traits = {
-		sprite_batch = love.graphics.newSpriteBatch(type.image),
+		sprite_batch = love.graphics.newSpriteBatch(self.image),
 		alive = true,
 		stale = false,
 		locations = {}
 	}
-	table.insert(type.groups, traits)
+	table.insert(self.groups, traits)
 end
 
-function spawn.stars(type, lower, upper)
+function spawn:stars(lower, upper)
 	-- spawn a number of the given type of stars ranging from lower to upper
 	
-	-- do some setup
-	local target = nil
-	if type == "near" then
-		target = map.stars.near_stars
-	elseif type == "far" then
-		target = map.stars.far_stars
-	end
-	
 	-- select the active star group
-	for group_index, selected_group in pairs(target.groups) do
+	local target = nil
+	for group_index, selected_group in pairs(self.groups) do
 		if not stale then
 			target = selected_group
 		end
@@ -160,26 +143,9 @@ function spawn.stars(type, lower, upper)
 		local star_y = util.weighted_random(1, love.graphics.getHeight(), weight)
 		-- add a star
 		local quad_index = 0
-		local star_type = love.math.random()
-		if type == "near" then
-			if star_type <= 0.334 then
-				star_type = "a"
-				quad_index = target.sprite_batch:add(map.stars.near_stars.quad_a, star_x, star_y)
-			elseif star_type > 0.333 and star_type <= 0.667 then
-				star_type = "b"
-				quad_index = target.sprite_batch:add(map.stars.near_stars.quad_b, star_x, star_y)
-			elseif star_type > 0.667 then
-				star_type = "c"
-				quad_index = target.sprite_batch:add(map.stars.near_stars.quad_c, star_x, star_y)
-			end
-		elseif type == "far" then
-			star_type = "none"
-			quad_index = target.sprite_batch:add(map.stars.far_stars.quad, star_x, star_y)
-		
-		end
+		quad_index = target.sprite_batch:add(self.quad, star_x, star_y)
 		local traits = {
 			index = quad_index,
-			star_type = star_type,
 			x = star_x,
 			y = star_y
 		}
@@ -193,9 +159,12 @@ function spawn.explosion(x, y, starting_size, MAX)
 	local traits = {
 		x = x,
 		y = y,
-		switch = "explode",
 		size = starting_size,
-		MAX_EXPLOSION = MAX
+		first_ring_size = starting_size + 2,
+		second_ring_size = starting_size + 5,
+		MAX_EXPLOSION = MAX,
+		speed = 22,
+		switch = "explode"
 	}
 	
 	table.insert(map.explosions, traits)
@@ -227,13 +196,11 @@ function spawn.prepare_constant_data()
 	game_status.interface_font = love.graphics.newFont("assets/DejaVuSans-Bold.ttf", 12)
 	
 	-- set up the background
-	map.stars.near_stars.image = love.graphics.newImage("assets/near-star.png")
-	map.stars.near_stars.quad_a = love.graphics.newQuad(2, 3, 3, 3, 19, 9)
-	map.stars.near_stars.quad_b = love.graphics.newQuad(7, 3, 5, 3, 19, 9)
-	map.stars.near_stars.quad_c = love.graphics.newQuad(14, 2, 3, 5, 19, 9)
+	map.stars.near_stars.image = love.graphics.newImage("assets/star.png")
+	map.stars.near_stars.quad = love.graphics.newQuad(0, 0, 2, 2, 2, 2)
 	table.insert(map.stars.near_stars.groups, {sprite_batch = love.graphics.newSpriteBatch(map.stars.near_stars.image), stale = false, alive = true, locations = {} } )
 	
-	map.stars.far_stars.image = love.graphics.newImage("assets/far-star.png")
+	map.stars.far_stars.image = love.graphics.newImage("assets/star.png")
 	map.stars.far_stars.quad = love.graphics.newQuad(0, 0, 2, 2, 2, 2)
 	table.insert(map.stars.far_stars.groups, {sprite_batch = love.graphics.newSpriteBatch(map.stars.far_stars.image), stale = false, alive = true, locations = {} } )
 	
@@ -247,7 +214,8 @@ function spawn.prepare_constant_data()
 	player.large_height = player.appearance.large_sprite:getHeight()
 	
 	-- set up player attacks
-	player.projectile_sprite = love.graphics.newImage("assets/player-projectile.png")
+	player.small_projectile_sprite = love.graphics.newImage("assets/player-projectile.png")
+	player.large_projectile_sprite = love.graphics.newImage("assets/asterisk.png")
 	
 	-- set up textures for enemies
 	enemies.basic.sprite = love.graphics.newImage("assets/basic-enemy.png")
@@ -258,5 +226,5 @@ end -- spawn.prepare_constant_data
 
 return spawn
 
--- this library copyright 2016-20 by GV (WPA) and licensed only under Apache License Version 2.0
+-- this library copyright 2016-20 GV (WPA) and licensed only under Apache License Version 2.0
 -- cf https://www.apache.org/licenses/LICENSE-2.0

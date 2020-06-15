@@ -34,44 +34,7 @@ function util.weighted_random(bottom, top, weight)
 	return constrained_random
 end
 
-function util.table_copy(existing_table)
-	-- create a copy of a table, including all subtables
-	-- this creates a second set of data, with nothing linking the tables
-	
-	local new_table = {}
-	
-	for key, value in pairs(existing_table) do
-		if type(value) ~= "table" then
-			new_table[key] = value
-		elseif type(value) == "table" then
-			new_table[key] = util.table_copy(value)
-		end
-	end
-	
-	return new_table
-end
-
-function util.easy_reset(main_table)
-	-- use the current values in the supplied table to enable easy resetting of values in it
-	-- setting a value to nil will reset it to its value before this function was called
-	
-	-- copy the initial values
-	main_table._defaults = {}
-	for key, value in pairs(main_table) do
-		main_table._defaults[key] = value
-	end
-	
-	setmetatable(main_table, main_table._defaults)
-	
-	-- make lookups on nil values return the default value
-	main_table._defaults.__index = main_table._defaults
-	
-	-- apply the metatable shenanigans to sub-tables
-	for key, value in pairs(main_table) do
-		if type(value) == "table" and tostring(key) ~= "_defaults" then
-			util.easy_reset(main_table[key])
-		end
-	end
-end
-
 return util
+
+-- this library copyright 2019-20 GV (WPA) and licensed only under Apache License Version 2.0
+-- cf https://www.apache.org/licenses/LICENSE-2.0

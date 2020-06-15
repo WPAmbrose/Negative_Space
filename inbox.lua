@@ -17,10 +17,6 @@ function love.joystickadded(controller)
 	-- a controller was connected, so make it the active controller
 	if controller:isGamepad() then
 		controls.controller = controller
-		if game_status.debug_messages then
-			print(string.format("Controller added, %s is the active controller", controls.controller:getName()))
-			game_status.debug_text = string.format("Controller added, %s is the active controller", controls.controller:getName())
-		end
 	end
 end
 
@@ -33,10 +29,6 @@ function love.joystickremoved()
 	if #all_controllers > 0 then
 		-- set the active controller to the last one in the list returned by LOVE
 		controls.controller = all_controllers(#all_controllers)
-		if game_status.debug_messages then
-			print(string.format("Controller disconnected, %s is the active controller, game paused"), controls.controller)
-			game_status.debug_text = string.format("Controller disconnected, %s is the active controller, game paused", controls.controller)
-		end
 	elseif #all_controllers == 0 then
 		-- there are no controllers connected, so replace the controller table with
 		-- some fallback functions that keep things working
@@ -48,10 +40,6 @@ function love.joystickremoved()
 				return 0
 			end
 		}
-		if game_status.debug_messages then
-			print("Controller disconnected, no controllers detected, game paused")
-			game_status.debug_text = "Controller disconnected, no controllers detected, game paused"
-		end
 	end
 end
 
@@ -73,9 +61,25 @@ function inbox.chunky_input(pressed, input_device, keypress)
 		if pressed == control_set.pause or pressed == "pause" then
 			-- pause the game
 			game_status.menu = "pause"
-			if game_status.debug_messages then
-				print("Game paused")
-				game_status.debug_text = "Game paused"
+		elseif pressed == control_set.form_up then
+			if player.form == "small" then
+				player.form = "medium"
+				player.height = player.medium_height
+				player.y = player.y - ((player.medium_height - player.small_height) / 2)
+			elseif player.form == "medium" then
+				player.form = "large"
+				player.height = player.large_height
+				player.y = player.y - ((player.large_height - player.medium_height) / 2)
+			end
+		elseif pressed == control_set.form_down then
+			if player.form == "large" then
+				player.form = "medium"
+				player.height = player.medium_height
+				player.y = player.y + ((player.large_height - player.medium_height) / 2)
+			elseif player.form == "medium" then
+				player.form = "small"
+				player.height = player.small_height
+				player.y = player.y + ((player.medium_height - player.small_height) / 2)
 			end
 		end
 	elseif game_status.menu == "pause" then
@@ -83,23 +87,19 @@ function inbox.chunky_input(pressed, input_device, keypress)
 		if pressed == control_set.pause or pressed == "pause" then
 			-- unpause the game
 			game_status.menu = "none"
-			if game_status.debug_messages then
-				print("Game unpaused")
-				game_status.debug_text = "Game unpaused"
-			end
 		elseif pressed == "x" then
-			-- the player is trying to do a guaranteed quit of the game
+			-- the player is trying to quit the game
 			game_status.menu = "quit_check"
-			if game_status.debug_messages then
-				print("Entered quit confirmation dialog box")
-				game_status.debug_text = "Entered quit confirmation dialog box"
-			end
 		elseif pressed == control_set.debug then
 			game_status.menu = "debug"
-			if game_status.debug_messages then
-				print("Entered debug mode")
-				game_status.debug_text = "Entered debug mode"
-			end
+		end
+	elseif game_status.menu == "game_over" then
+		if pressed == control_set.pause or pressed == "pause" then
+			-- unpause the game
+			game_status.menu = "none"
+		elseif pressed == "x" then
+			-- the player is trying to quit the game
+			game_status.menu = "quit_check"
 		end
 	elseif game_status.menu == "quit_check" then
 		-- the player selected the quit option, ask if they're sure
@@ -107,10 +107,6 @@ function inbox.chunky_input(pressed, input_device, keypress)
 			game_status.menu = "pause"
 		elseif pressed == "x" then
 			-- the player is trying to do a guaranteed quit of the game
-			if game_status.debug_messages then
-				print("Player quit the game")
-				game_status.debug_text = "Player quit the game"
-			end
 			game_status.menu = "quit_confirmed"
 			love.event.quit()
 		end
@@ -118,10 +114,6 @@ function inbox.chunky_input(pressed, input_device, keypress)
 		-- debug mode is active, where the player can alter the game on a broad scale
 		if pressed == control_set.debug or pressed == control_set.pause or pressed == "b" then
 			game_status.menu = "pause"
-			if game_status.debug_messages then
-				print("Exited debug mode")
-				game_status.debug_text = "Exited debug mode"
-			end
 		elseif pressed == "p" then
 			player.alive = false
 		elseif pressed == "h" then
@@ -139,16 +131,6 @@ function inbox.chunky_input(pressed, input_device, keypress)
 					selected_enemy.health = 0
 				end
 			end
-		elseif pressed == "i" then
-			-- turn debug info on or off
-			if game_status.debug_stats then
-				game_status.debug_stats = false
-			elseif not game_status.debug_stats then
-				game_status.debug_stats = true
-			end
-		elseif pressed == "r" then
-			-- reset the player's powerup state
-			
 		elseif pressed == "f" then
 			-- grant the player full health
 			player.health = player.max_health
@@ -172,13 +154,11 @@ function inbox.instant_press()
 	-- initialize timers
 	local espresso = {
 		pause = 0,
-		ability = 0,
 		main_attack = 0,
 		up = 0,
 		down = 0,
 		left = 0,
-		right = 0,
-		debug = 0
+		right = 0
 	}
 	
 	if controls.controller:isGamepadDown(controls.cnt.up) then
@@ -246,19 +226,6 @@ function inbox.instant_press()
 		end
 	end
 	
-	if controls.controller:isGamepadDown(controls.cnt.ability) then
-		espresso.ability = 1
-	end
-	if not controls.kbd.modifier.ability then
-		if love.keyboard.isScancodeDown(controls.kbd.bindings.ability) then
-			espresso.ability = 1
-		end
-	elseif controls.kbd.modifier.ability then
-		if love.keyboard.isDown(controls.kbd.bindings.ability) then
-			espresso.ability = 1
-		end
-	end
-	
 	for key, value in pairs(espresso) do
 		-- this control is being held down
 		controls.quick_detect[key] = controls.quick_detect[key] - espresso[key]
@@ -312,5 +279,5 @@ end -- inbox.stick_poll
 
 return inbox
 
--- this library copyright 2017-20 by GV (WPA) and licensed only under Apache License Version 2.0
+-- this library copyright 2017-20 GV (WPA) and licensed only under Apache License Version 2.0
 -- cf https://www.apache.org/licenses/LICENSE-2.0
