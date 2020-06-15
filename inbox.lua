@@ -266,7 +266,7 @@ function inbox.instant_press()
 			-- set the timer to 0 as this key isn't being pressed
 			controls.quick_detect[key] = 0
 		end
-		if controls.quick_detect[key] <= -9 then
+		if controls.quick_detect[key] < -9 then
 			controls.quick_detect[key] = -9
 		end
 	end
@@ -281,30 +281,30 @@ function inbox.stick_poll(dt)
 	
 	-- get and store the intensity of vertical and horizontal displacement of the analog sticks
 	if controls.controller:getGamepadAxis("leftx") >= 0.05 then
-		sticks.positions.left_horizontal = util.round(controls.controller:getGamepadAxis("leftx"), 0.1)
+		sticks.positions.left_horizontal = util.round(controls.controller:getGamepadAxis("leftx"), 0.01)
 	elseif controls.controller:getGamepadAxis("leftx") <= -0.05 then
-		sticks.positions.left_horizontal = util.round(controls.controller:getGamepadAxis("leftx"), 0.1)
+		sticks.positions.left_horizontal = util.round(controls.controller:getGamepadAxis("leftx"), 0.01)
 	else
 		sticks.positions.left_horizontal = 0
 	end
 	if controls.controller:getGamepadAxis("lefty") >= 0.05 then
-		sticks.positions.left_vertical = util.round(controls.controller:getGamepadAxis("lefty"), 0.1)
+		sticks.positions.left_vertical = util.round(controls.controller:getGamepadAxis("lefty"), 0.01)
 	elseif controls.controller:getGamepadAxis("lefty") <= -0.05 then
-		sticks.positions.left_vertical = util.round(controls.controller:getGamepadAxis("lefty"), 0.1)
+		sticks.positions.left_vertical = util.round(controls.controller:getGamepadAxis("lefty"), 0.01)
 	else
 		sticks.positions.left_vertical = 0
 	end
 	if controls.controller:getGamepadAxis("rightx") >= 0.05 then
-		sticks.positions.right_horizontal = util.round(controls.controller:getGamepadAxis("rightx"), 0.1)
+		sticks.positions.right_horizontal = util.round(controls.controller:getGamepadAxis("rightx"), 0.01)
 	elseif controls.controller:getGamepadAxis("rightx") <= -0.05 then
-		sticks.positions.right_horizontal = util.round(controls.controller:getGamepadAxis("rightx"), 0.1)
+		sticks.positions.right_horizontal = util.round(controls.controller:getGamepadAxis("rightx"), 0.01)
 	else
 		sticks.positions.right_horizontal = 0
 	end
 	if controls.controller:getGamepadAxis("righty") >= 0.1 then
-		sticks.positions.right_vertical = util.round(controls.controller:getGamepadAxis("righty"), 0.1)
+		sticks.positions.right_vertical = util.round(controls.controller:getGamepadAxis("righty"), 0.01)
 	elseif controls.controller:getGamepadAxis("righty") <= -0.1 then
-		sticks.positions.right_vertical = util.round(controls.controller:getGamepadAxis("righty"), 0.1)
+		sticks.positions.right_vertical = util.round(controls.controller:getGamepadAxis("righty"), 0.01)
 	else
 		sticks.positions.right_vertical = 0
 	end

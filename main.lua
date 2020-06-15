@@ -38,6 +38,8 @@ player = {
 	spawn_timer = 0,
 	flicker_timer = 0,
 	flicker_max = 0.070,
+	horizontal_speed = nil,
+	vertical_speed = nil,
 	low_speed = 120,
 	medium_speed = 150,
 	high_speed = 180,
@@ -47,7 +49,7 @@ player = {
 		medium_sprite = nil,
 		large_sprite = nil
 	},
-	projectile_speed = 200,
+	projectile_speed = 240,
 	projectile_sprite = nil,
 	projectile_timer = 0,
 	projectiles = {}
@@ -118,7 +120,6 @@ controls = {
 		right = 0,
 		debug = 0
 	},
-	clash_cooldown = nil,
 	controller = nil
 }
 --[[
@@ -134,15 +135,39 @@ glossary of named states and important variables and data points for controls:
 		vertical_threshhold: 0.1 ... 1.0 -- threshhold for vertical analog stick movement to cause action
 		positions: table -- holds the intensity of horizontal and vertical displacement of each analog stick
 			left_horizontal ... right_vertical: -1.0 ... 1.0 -- degree of inclination in a dimension per stick
-	clash_cooldown: number, seconds -- manages various control error cooldowns
 	controller: table -- holds various data and functions relating to the active controller
 ]]--
 
+map = {
+	stars = {
+		near_stars = {
+			image = nil,
+			quad = nil,
+			speed = 3.2,
+			groups = {}
+		},
+		far_stars = {
+			image = nil,
+			quad = nil,
+			speed = 2,
+			groups = {}
+		}
+	}
+}
+
 enemies = {
-	timer = 8,
+	spawn_timer = 7,
+	attack_timer = 8.5,
 	basic = {
 		sprite = nil,
-		locations = {}
+		locations = {},
+		projectiles = {
+			sprite = nil,
+			speed = 180,
+			width = 25,
+			height = 25,
+			locations = {}
+		}
 	}
 }
 
@@ -227,13 +252,57 @@ function love.update(dt)
 		end
 	end
 	
-	-- poll the active controller's analog sticks
-	if controls.controller then
-		inbox.stick_poll(dt)
+	-- get the controls being pressed right now
+	inbox.instant_press()
+	
+	local quick_detect = controls.quick_detect
+	
+	if quick_detect.up or quick_detect.down then
+		player.vertical_speed = player.medium_speed
+	end
+	if quick_detect.left or quick_detect.right then
+		player.horizontal_speed = player.medium_speed
 	end
 	
-	-- set some convenience data to deal with controls
-	inbox.instant_press()
+	-- poll the active controller's analog sticks and set various data relating to movement
+	local sticks = controls.cnt.analog_sticks
+	if controls.controller then
+		inbox.stick_poll(dt)
+		
+		-- fudge the controls a bit
+		if sticks.positions.left_vertical > sticks.slow_vertical_threshhold then
+			controls.quick_detect.down = -1
+		elseif sticks.positions.left_vertical < -sticks.slow_vertical_threshhold then
+			controls.quick_detect.up = -1
+		end
+		
+		if sticks.positions.left_horizontal > sticks.slow_horizontal_threshhold then
+			controls.quick_detect.right = -1
+		elseif sticks.positions.left_horizontal < -sticks.slow_horizontal_threshhold then
+			controls.quick_detect.left = -1
+		end
+		
+		-- set movement speeds in different directions
+		if math.abs(sticks.positions.left_vertical) >= sticks.slow_vertical_threshhold then
+			player.vertical_speed = player.low_speed
+			if math.abs(sticks.positions.left_vertical) >= sticks.medium_vertical_threshhold then
+				player.vertical_speed = player.medium_speed
+				if math.abs(sticks.positions.left_vertical) >= sticks.fast_vertical_threshhold then
+					player.vertical_speed = player.high_speed
+				end
+			end
+		end
+		
+		if math.abs(sticks.positions.left_horizontal) >= sticks.slow_horizontal_threshhold then
+			player.horizontal_speed = player.low_speed
+			if math.abs(sticks.positions.left_horizontal) >= sticks.medium_horizontal_threshhold then
+				player.horizontal_speed = player.medium_speed
+				if math.abs(sticks.positions.left_horizontal) >= sticks.fast_horizontal_threshhold then
+					player.horizontal_speed = player.high_speed
+				end
+			end
+		end
+	end
 	
 	if game_status.menu == "none" then
 		-- run the main game logic
@@ -242,59 +311,105 @@ function love.update(dt)
 			-- loop over enemies
 			
 			-- move enemies
-			if selected_enemy.direction == "left" then
+			if selected_enemy.horizontal_direction == "left" then
 				selected_enemy.x = selected_enemy.x - selected_enemy.speed * dt
-			elseif selected_enemy.direction == "right" then
+			elseif selected_enemy.horizontal_direction == "right" then
 				selected_enemy.x = selected_enemy.x + selected_enemy.speed * dt
-			elseif selected_enemy.direction == "up" then
+			end
+			if selected_enemy.vertical_direction == "up" then
 				selected_enemy.y = selected_enemy.y - selected_enemy.speed * dt
-			elseif selected_enemy.direction == "down" then
+			elseif selected_enemy.vertical_direction == "down" then
 				selected_enemy.y = selected_enemy.y + selected_enemy.speed * dt
+			end
+			if selected_enemy.horizontal_direction == "sine" and selected_enemy.vertical_direction == "sine" then
+				selected_enemy.x = selected_enemy.x - selected_enemy.speed * dt
+				selected_enemy.y = math.sin(selected_enemy.x * love.graphics.getHeight()) + (love.graphics.getHeight() / 2)
 			end
 			
 			-- check for collisions with the player
-			if player.flinch_timer == 0 then
+			if not player.hurt then
 				if shc.check_collision(player.x, player.y, player.width, player.height, selected_enemy.x, selected_enemy.y, selected_enemy.width, selected_enemy.height, "full") then
 					-- damage the player
 					player.health = player.health - 1
 					player.flinch_timer = 1
+					player.hurt = true
 				end
 			end
 			
 			-- check for enemies leaving the screen
 			if selected_enemy.x + selected_enemy.width < 0 or selected_enemy.x > love.graphics.getWidth() or selected_enemy.y + selected_enemy.height < 0 or selected_enemy.y > love.graphics.getHeight() then
 				-- the enemy is off the screen, despawn it
-				enemies.basic.locations[enemy_index] = nil
+				enemies.basic.locations[enemy_index] = enemies.basic.locations[#enemies.basic.locations]
+				enemies.basic.locations[#enemies.basic.locations] = nil
 			end
 			
 			-- check for player projectiles hitting an enemy
 			for projectile_index, selected_projectile in pairs(player.projectiles) do
-				if shc.check_collision(selected_projectile.x, selected_projectile.y, player.projectile_sprite:getWidth(), player.projectile_sprite:getHeight(), selected_enemy.x, selected_enemy.y, selected_enemy.width, selected_enemy.height, "full") then
-					-- the enemy was hit, despawn it
-					enemies.basic.locations[enemy_index] = nil
+				if shc.check_collision(selected_projectile.x, selected_projectile.y, player.projectile_sprite:getWidth(), player.projectile_sprite:getHeight(), selected_enemy.x, selected_enemy.y, selected_enemy.width, selected_enemy.height, "right") then
+					-- the enemy was hit, despawn it and reset the projectile
+					enemies.basic.locations[enemy_index] = enemies.basic.locations[#enemies.basic.locations]
+					enemies.basic.locations[#enemies.basic.locations] = nil
+					player.projectile_timer = 0
 					selected_projectile.x = -100
 				end
 			end
 		end
 		
-		if player.flinch_timer > 0 then
-			player.flinch_timer = player.flinch_timer - dt
-		elseif player.flinch_timer <= 0 then
-			player.flinch_timer = 0
+		for projectile_index, selected_projectile in pairs(enemies.basic.projectiles.locations) do
+			-- loop over enemy projectiles
+			
+			-- move projectiles
+			selected_projectile.x = selected_projectile.x - enemies.basic.projectiles.speed * dt
+			
+			-- check for player collisions
+			if not player.hurt then
+				if shc.check_collision(selected_projectile.x, selected_projectile.y, enemies.basic.projectiles.width, enemies.basic.projectiles.height, player.x, player.y, player.width, player.height, "left") then
+					-- damage the player
+					player.health = player.health - 1
+					player.flinch_timer = 1
+					player.hurt = true
+				end
+			end
+			
+			-- check for player projectiles hitting an enemy projectile
+			for player_projectile_index, selected_player_projectile in pairs(player.projectiles) do
+				if shc.check_collision(selected_projectile.x, selected_projectile.y, enemies.basic.projectiles.width, enemies.basic.projectiles.height, selected_player_projectile.x, selected_player_projectile.y, player.projectile_sprite:getWidth(), player.projectile_sprite:getHeight(), "right") then
+					-- the player hit an enemy projectile with their own, remove both
+					table.remove(enemies.basic.projectiles.locations, projectile_index)
+					player.projectile_timer = 0
+					selected_player_projectile.x = -100
+				end
+			end
+			
+			if selected_projectile.x + enemies.basic.projectiles.width < 0 then
+				-- remove projectiles that go off the screen
+				table.remove(enemies.basic.projectiles.locations, projectile_index)
+			end
+		end
+		
+		-- manage player projectiles
+		for projectile_index, selected_projectile in pairs(player.projectiles) do
+			if selected_projectile.x >= love.graphics.getWidth() then
+				selected_projectile.x = -100
+			elseif selected_projectile.x > 0 and selected_projectile.x < love.graphics.getWidth() then
+				selected_projectile.x = selected_projectile.x + (player.projectile_speed * dt)
+			end
 		end
 		
 		if player.alive then
-			if controls.quick_detect.up < controls.quick_detect.down then
-				player.y = player.y - (player.medium_speed * dt)
-			elseif controls.quick_detect.down < controls.quick_detect.up then
-				player.y = player.y + (player.medium_speed * dt)
+			-- move the player
+			if quick_detect.up < quick_detect.down then
+				player.y = player.y - (player.vertical_speed * dt)
+			elseif quick_detect.down < quick_detect.up then
+				player.y = player.y + (player.vertical_speed * dt)
 			end
-			if controls.quick_detect.left < controls.quick_detect.right then
-				player.x = player.x - (player.medium_speed * dt)
-			elseif controls.quick_detect.right < controls.quick_detect.left then
-				player.x = player.x + (player.medium_speed * dt)
+			if quick_detect.left < quick_detect.right then
+				player.x = player.x - (player.horizontal_speed * dt)
+			elseif quick_detect.right < quick_detect.left then
+				player.x = player.x + (player.horizontal_speed * dt)
 			end
 			
+			-- keep the player on the screen
 			if player.x < 0 then
 				player.x = 0
 			elseif player.x + player.width > game_status.threshhold then
@@ -306,25 +421,28 @@ function love.update(dt)
 				player.y = love.graphics.getHeight() - player.height
 			end
 			
+			-- manage player hurt state
+			if player.hurt then
+				if player.flinch_timer > 0 then
+					player.flinch_timer = player.flinch_timer - dt
+				elseif player.flinch_timer <= 0 then
+					player.flinch_timer = 0
+					player.hurt = false
+				end
+			end
+			
+			-- manage player projectile spawning
 			if player.projectile_timer > 0 then
 				player.projectile_timer = player.projectile_timer - dt
 			elseif player.projectile_timer <= 0 then
 				player.projectile_timer = 0
 			end
 			
-			if controls.quick_detect.main_attack ~= 0 then
-				-- attack of the player (attack)
-				spawn.player_projectile(player.x + player.width, player.y + (player.height / 2))
+			if quick_detect.main_attack ~= 0 then
+				spawn.player_projectile(player.x + player.width, player.y + (player.height / 2) - (player.projectile_sprite:getHeight() / 2))
 			end
 			
-			for projectile_index, selected_projectile in pairs(player.projectiles) do
-				if selected_projectile.x >= love.graphics.getWidth() then
-					selected_projectile.x = -100
-				elseif selected_projectile.x > 0 and selected_projectile.x < love.graphics.getWidth() then
-					selected_projectile.x = selected_projectile.x + (player.projectile_speed * dt)
-				end
-			end
-			
+			-- manage player health and death
 			if player.health <= 0 then
 				player.spawn_timer = 3
 				player.alive = false
@@ -334,18 +452,91 @@ function love.update(dt)
 			player.spawn_timer = player.spawn_timer - dt
 			if player.spawn_timer <= 0 then
 				player.spawn_timer = 0
+				player.flinch_timer = 0
 				spawn.player(0, 235)
 			end
 		end
 		
-		if enemies.timer > 0 then
-			enemies.timer = enemies.timer - dt
-		elseif enemies.timer <= 0 then
-			enemies.timer = 0
+		if enemies.spawn_timer > 0 then
+			enemies.spawn_timer = enemies.spawn_timer - dt
+		elseif enemies.spawn_timer <= 0 then
+			-- spawn a new enemy
 			local rand_x = util.weighted_random(750, 950, 880)
 			local rand_y = util.weighted_random(50, 450, 250)
-			spawn.enemy("standard", 25, 25, rand_x, rand_y, "left", 100, 1)
-			enemies.timer = 4
+			spawn.enemy("standard", 31, 31, rand_x, rand_y, "random", "random", 100, 1)
+			enemies.spawn_timer = 2.70
+		end
+		
+		if enemies.attack_timer > 0 then
+			enemies.attack_timer = enemies.attack_timer - dt
+		elseif enemies.attack_timer <= 0 and #enemies.basic.locations > 0 then
+			local rand_enemy = math.floor(love.math.random(1, #enemies.basic.locations))
+			if enemies.basic.locations[rand_enemy].x > game_status.threshhold then
+				-- make a random enemy attack if it's not too close to the player
+				table.insert(enemies.basic.projectiles.locations, {
+					x = enemies.basic.locations[rand_enemy].x - enemies.basic.projectiles.width,
+					y = enemies.basic.locations[rand_enemy].y
+				})
+			end
+			enemies.attack_timer = 1.35
+		end
+		
+		-- spawn stars
+		spawn.stars("near", 1, 10)
+		spawn.stars("far", 1, 12)
+		
+		for type_index, selected_type in pairs(map.stars) do
+			for group_index, selected_group in pairs(selected_type.groups) do
+				-- iterate over groups of stars
+				for star_index, selected_star in pairs(selected_group.locations) do
+					-- move the stars in this group
+					selected_star.x = selected_star.x - selected_type.speed
+					selected_group.sprite_batch:set(selected_star.index, selected_type.quad, selected_star.x, selected_star.y)
+					
+					if selected_group.sprite_batch:getCount() > 950 then
+						-- this group is full, stop adding to it
+						selected_group.stale = true
+					end
+					
+					if selected_star.x < 0 then
+						-- the stars in this group are off the screen, mark it for deletion
+						selected_group.alive = false
+					elseif selected_star.x >= 0 then
+						selected_group.alive = true
+					end
+				end
+			end
+		end
+		
+		-- create new star groups if all existing groups are full
+		local all_stale = true
+		
+		for group_index, selected_group in pairs(map.stars.near_stars.groups) do
+			if not selected_group.stale then
+				all_stale = false
+			end
+		end
+		
+		if all_stale then
+			spawn.star_group(map.stars.near_stars)
+		end
+		
+		for group_index, selected_group in pairs(map.stars.far_stars.groups) do
+			if not selected_group.stale then
+				all_stale = false
+			end
+		end
+		
+		if all_stale then
+			spawn.star_group(map.stars.far_stars)
+		end
+		
+		for type_index, selected_type in pairs(map.stars) do
+			for group_index, selected_group in pairs(selected_type.groups) do
+				if selected_group.alive == false then
+					selected_type[group_index] = nil
+				end
+			end
 		end
 	elseif game_status.menu == "pause" then
 		-- the game is paused
@@ -356,11 +547,29 @@ end -- love.update
 
 function love.draw()
 	-- draw the background
+	for type_index, selected_type in pairs(map.stars) do
+		for group_index, selected_group in pairs(selected_type.groups) do
+			love.graphics.draw(selected_group.sprite_batch)
+		end
+	end
 	
 	-- draw the player
+	if player.hurt then
+		if player.flicker_timer <= 0 then
+			player.flicker_timer = player.flicker_max
+		elseif player.flicker_timer > player.flicker_max / 2 then
+			player.flicker_timer = player.flicker_timer - love.timer.getDelta()
+			love.graphics.setColor(255, 255, 255, 255)
+		elseif player.flicker_timer <= player.flicker_max / 2 then
+			-- make the player sprite invisible briefly
+			player.flicker_timer = player.flicker_timer - love.timer.getDelta()
+			love.graphics.setColor(255, 255, 255, 0)
+		end
+	end
 	if player.form == "small" then
 		love.graphics.draw(player.appearance.small_sprite, player.x, player.y)
 	end
+	love.graphics.setColor(255, 255, 255, 255)
 	
 	-- draw enemies
 	for enemy_index, selected_enemy in pairs(enemies.basic.locations) do
@@ -368,6 +577,10 @@ function love.draw()
 	end
 	
 	-- draw projectiles
+	for projectile_index, selected_projectile in pairs(enemies.basic.projectiles.locations) do
+		love.graphics.draw(enemies.basic.projectiles.sprite, selected_projectile.x, selected_projectile.y)
+	end
+	
 	for projectile_index, selected_projectile in pairs(player.projectiles) do
 		love.graphics.draw(player.projectile_sprite, selected_projectile.x, selected_projectile.y)
 	end

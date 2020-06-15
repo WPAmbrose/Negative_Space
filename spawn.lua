@@ -43,7 +43,7 @@ function spawn.player_projectile(x, y)
 	end
 end -- spawn.player_projectile
 
-function spawn.enemy(type, width, height, origin_x, origin_y, direction, speed, starting_health)
+function spawn.enemy(type, width, height, origin_x, origin_y, horizontal_direction, vertical_direction, speed, starting_health)
 	-- place enemies of all kinds
 	
 	-- type indicates the type of enemy
@@ -54,39 +54,52 @@ function spawn.enemy(type, width, height, origin_x, origin_y, direction, speed, 
 	-- starting_health indicates how many hit points of health the enemy has to begin with
 	
 	local type = type
-	local width = width or 25
-	local height = height or 25
+	local width = width or 31
+	local height = height or 31
 	local origin_x = origin_x
 	local origin_y = origin_y
-	local direction = direction or "random"
+	local horizontal_direction = horizontal_direction or "random"
+	local vertical_direction = vertical_direction or "random"
 	local speed = speed or 100
 	local starting_health = starting_health or 1
 	
-	local facing = nil
 	local movement_switch = nil
 	local hurt = false
 	local flinch_timer = nil
 	local death_timer = nil
 	
-	if direction == "random" then
+	if horizontal_direction == "random" then
 		-- pick a direction at random
 		local pathway = love.math.random()
-		if pathway <= 0.25 then
-			direction = "up"
-			facing = "up"
-		elseif pathway > 0.25 and pathway <= 0.50 then
-			direction = "down"
-			facing = "down"
-		elseif pathway > 0.50 and pathway <= 0.75 then
-			direction = "left"
-			facing = "left"
-		elseif pathway > 0.75 and pathway <= 1.00 then
-			direction = "right"
-			facing = "right"
+		if pathway <= 0.70 then
+			horizontal_direction = "left"
+		elseif pathway > 0.70 then
+			horizontal_direction = "right"
+		end
+		if vertical_direction ~= "random" then
+			-- randomly give this no horizontal component, provided there's a vertical component
+			pathway = love.math.random()
+			if pathway > 0.35 then
+				horizontal_direction = "none"
+			end
 		end
 	end
-	
-	print("spawned enemy at: " .. tostring(origin_x) .. ", " .. tostring(origin_y))
+	if vertical_direction == "random" then
+		-- pick a direction at random
+		local pathway = love.math.random()
+		if pathway <= 0.50 then
+			vertical_direction = "up"
+		elseif pathway > 0.50 then
+			vertical_direction = "down"
+		end
+		if horizontal_direction ~= "none" then
+			-- randomly give this no vertical component, provided there's a horizontal component
+			pathway = love.math.random()
+			if pathway > 0.65 then
+				vertical_direction = "none"
+			end
+		end
+	end
 	
 	-- set the traits of this enemy
 	local traits = {
@@ -95,20 +108,15 @@ function spawn.enemy(type, width, height, origin_x, origin_y, direction, speed, 
 		width = width,
 		height = height,
 		facing = facing,
-		direction = direction,
+		horizontal_direction = horizontal_direction,
+		vertical_direction = vertical_direction,
 		speed = speed,
-		movement_switch = movement_switch,
 		health = starting_health,
 		hurt = hurt,
 		death_timer = death_timer,
 		attack = {
 			state = "ready",
-			duration = 0.070,
-			cooldown = 0.175,
-			hitbox = {
-				x = 0,
-				y = 0
-			}
+			cooldown = 0.175
 		}
 	}
 	
@@ -117,49 +125,52 @@ function spawn.enemy(type, width, height, origin_x, origin_y, direction, speed, 
 	end
 end -- spawn.enemy
 
-function spawn.health(target, origin_x, origin_y, type)
-	-- spawns an item the player can pick up to regain health
-	
-	-- target refers to the table to put the health pickup in
-	-- origin_x and origin_y refer to the location the health pickup will spawn at
-	-- type refers to how much health the pickup restores
-	
-	-- specifying a sprite for the health pickup is not supported because it should always be clear
-	-- whether or not an item is a health pickup and which type of health pickup it is
-	
-	target = target or map.health_pickups.locations
-	origin_x = origin_x
-	origin_y = origin_y
-	type = type or "single"
-	local sprite = nil
-	local amount = nil
-	
-	if type == "single" then
-		-- spawn a pickup that restores 1 hit point
-		sprite = map.health_pickups.single_health_sprite
-		amount = 1
-	elseif type == "double" then
-		-- spawn a pickup that restores 2 hit points
-		sprite = map.health_pickups.double_health_sprite
-		amount = 2
-	elseif type == "quadruple" then
-		-- spawn a pickup that restores 4 hit points
-		sprite = map.health_pickups.quad_health_sprite
-		amount = 4
-	end
+function spawn.star_group(type)
+	-- create a new star group
 	
 	local traits = {
-		x = origin_x,
-		y = origin_y,
-		width = sprite:getWidth(),
-		height = sprite:getHeight(),
-		type = type,
-		sprite = sprite,
-		amount = amount
+		sprite_batch = love.graphics.newSpriteBatch(type.image),
+		alive = true,
+		stale = false,
+		locations = {}
 	}
-	
-	table.insert(target, traits)
+	table.insert(type.groups, traits)
 end
+
+function spawn.stars(type, lower, upper)
+	-- spawn a number of the given type of stars ranging from lower to upper
+	
+	-- do some setup
+	if type == "near" then
+		type = map.stars.near_stars
+	elseif type == "far" then
+		type = map.stars.far_stars
+	end
+	
+	-- select the active star group
+	local target = nil
+	for group_index, selected_group in pairs(type.groups) do
+		if not stale then
+			target = selected_group
+		end
+	end
+	
+	-- calculate positions
+	local star_count = love.math.random(lower, upper)
+	for star = 1, star_count do
+		local weight = love.math.random(1, love.graphics.getHeight())
+		local star_x = love.graphics.getWidth() - 1
+		local star_y = util.weighted_random(1, love.graphics.getHeight(), weight)
+		-- add a star
+		local quad_index = target.sprite_batch:add(type.quad, star_x, star_y)
+		local traits = {
+			index = quad_index,
+			x = star_x,
+			y = star_y
+		}
+		table.insert(target.locations, traits)
+	end
+end -- spawn.stars
 
 
 function spawn.prepare_constant_data()
@@ -187,10 +198,13 @@ function spawn.prepare_constant_data()
 	game_status.font = love.graphics.newFont("assets/DejaVuSans.ttf", 12)
 	
 	-- set up the background
+	map.stars.near_stars.image = love.graphics.newImage("assets/near-star.png")
+	map.stars.near_stars.quad = love.graphics.newQuad(0, 0, 2, 2, 2, 2)
+	table.insert(map.stars.near_stars.groups, {sprite_batch = love.graphics.newSpriteBatch(map.stars.near_stars.image), stale = false, alive = true, locations = {} } )
 	
-	-- load up and section out user interface graphics
-	
-	-- set up the sprite batch and texture atlas used for solid structures
+	map.stars.far_stars.image = love.graphics.newImage("assets/far-star.png")
+	map.stars.far_stars.quad = love.graphics.newQuad(0, 0, 1, 1, 1, 1)
+	table.insert(map.stars.far_stars.groups, {sprite_batch = love.graphics.newSpriteBatch(map.stars.far_stars.image), stale = false, alive = true, locations = {} } )
 	
 	-- set up player sprites
 	player.appearance.small_sprite = love.graphics.newImage("assets/ship-small.png")
@@ -201,12 +215,8 @@ function spawn.prepare_constant_data()
 	-- set up textures for enemies
 	enemies.basic.sprite = love.graphics.newImage("assets/basic-enemy.png")
 	
-	-- set up powerups
-	
-	-- set up the sprites for health items
-	
-	-- load the sprite for the level exit
-	
+	-- load enemy attack sprites
+	enemies.basic.projectiles.sprite = love.graphics.newImage("assets/gear.png")
 end -- spawn.prepare_constant_data
 
 return spawn

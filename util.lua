@@ -55,6 +55,7 @@ function util.easy_reset(main_table)
 	-- use the current values in the supplied table to enable easy resetting of values in it
 	-- setting a value to nil will reset it to its value before this function was called
 	
+	-- copy the initial values
 	main_table._defaults = {}
 	for key, value in pairs(main_table) do
 		main_table._defaults[key] = value
@@ -62,10 +63,10 @@ function util.easy_reset(main_table)
 	
 	setmetatable(main_table, main_table._defaults)
 	
-	main_table._defaults.__index = function (table, key)
-		return main_table._defaults[key]
-	end
+	-- make lookups on nil values return the default value
+	main_table._defaults.__index = main_table._defaults
 	
+	-- apply the metatable shenanigans to sub-tables
 	for key, value in pairs(main_table) do
 		if type(value) == "table" and tostring(key) ~= "_defaults" then
 			util.easy_reset(main_table[key])
