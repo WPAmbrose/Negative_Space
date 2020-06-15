@@ -97,6 +97,12 @@ function inbox.chunky_input(pressed, input_device, keypress)
 					print("Entered quit confirmation dialog box")
 					game_status.debug_text = "Entered quit confirmation dialog box"
 				end
+			elseif pressed == control_set.debug then
+				game_status.menu = "debug"
+				if game_status.debug_messages then
+					print("Entered debug mode")
+					game_status.debug_text = "Entered debug mode"
+				end
 			end
 		elseif game_status.menu == "quit_check" then
 			-- the player selected the quit option, ask if they're sure
@@ -149,7 +155,7 @@ function inbox.chunky_input(pressed, input_device, keypress)
 			elseif pressed == "f" then
 				-- grant the player full health
 				player.health = player.max_health
-			elseif pressed == "b" then
+			elseif pressed == "t" then
 				-- resurrect the player (only effective when the player is dead but not despawned yet)
 				player.alive = true
 				player.health = 1
@@ -179,33 +185,7 @@ function inbox.instant_press()
 		debug = 0
 	}
 	
-	if controls.controller:isGamepadDown(controls.cnt.left) or controls.cnt.analog_sticks.horizontal_direction == "left" then
-		espresso.left = 1
-	end
-	if not controls.kbd.modifier.left then
-		if love.keyboard.isScancodeDown(controls.kbd.bindings.left) then
-			espresso.left = 1
-		end
-	elseif controls.kbd.modifier.left then
-		if love.keyboard.isDown(controls.kbd.bindings.left) then
-			espresso.left = 1
-		end
-	end
-	
-	if controls.controller:isGamepadDown(controls.cnt.right) or controls.cnt.analog_sticks.horizontal_direction == "right" then
-		espresso.right = 1
-	end
-	if not controls.kbd.modifier.right then
-		if love.keyboard.isScancodeDown(controls.kbd.bindings.right) then
-			espresso.right = 1
-		end
-	elseif controls.kbd.modifier.right then
-		if love.keyboard.isDown(controls.kbd.bindings.right) then
-			espresso.right = 1
-		end
-	end
-	
-	if controls.controller:isGamepadDown(controls.cnt.up) or controls.cnt.analog_sticks.vertical_direction == "up" then
+	if controls.controller:isGamepadDown(controls.cnt.up) then
 		espresso.up = 1
 	end
 	if not controls.kbd.modifier.up then
@@ -218,7 +198,7 @@ function inbox.instant_press()
 		end
 	end
 	
-	if controls.controller:isGamepadDown(controls.cnt.down) or controls.cnt.analog_sticks.vertical_direction == "down" then
+	if controls.controller:isGamepadDown(controls.cnt.down) then
 		espresso.down = 1
 	end
 	if not controls.kbd.modifier.down then
@@ -231,16 +211,29 @@ function inbox.instant_press()
 		end
 	end
 	
-	if controls.controller:isGamepadDown(controls.cnt.ability) then
-		espresso.ability = 1
+	if controls.controller:isGamepadDown(controls.cnt.left) then
+		espresso.left = 1
 	end
-	if not controls.kbd.modifier.ability then
-		if love.keyboard.isScancodeDown(controls.kbd.bindings.ability) then
-			espresso.ability = 1
+	if not controls.kbd.modifier.left then
+		if love.keyboard.isScancodeDown(controls.kbd.bindings.left) then
+			espresso.left = 1
 		end
-	elseif controls.kbd.modifier.ability then
-		if love.keyboard.isDown(controls.kbd.bindings.ability) then
-			espresso.ability = 1
+	elseif controls.kbd.modifier.left then
+		if love.keyboard.isDown(controls.kbd.bindings.left) then
+			espresso.left = 1
+		end
+	end
+	
+	if controls.controller:isGamepadDown(controls.cnt.right) then
+		espresso.right = 1
+	end
+	if not controls.kbd.modifier.right then
+		if love.keyboard.isScancodeDown(controls.kbd.bindings.right) then
+			espresso.right = 1
+		end
+	elseif controls.kbd.modifier.right then
+		if love.keyboard.isDown(controls.kbd.bindings.right) then
+			espresso.right = 1
 		end
 	end
 	
@@ -254,6 +247,19 @@ function inbox.instant_press()
 	elseif controls.kbd.modifier.main_attack then
 		if love.keyboard.isDown(controls.kbd.bindings.main_attack) then
 			espresso.main_attack = 1
+		end
+	end
+	
+	if controls.controller:isGamepadDown(controls.cnt.ability) then
+		espresso.ability = 1
+	end
+	if not controls.kbd.modifier.ability then
+		if love.keyboard.isScancodeDown(controls.kbd.bindings.ability) then
+			espresso.ability = 1
+		end
+	elseif controls.kbd.modifier.ability then
+		if love.keyboard.isDown(controls.kbd.bindings.ability) then
+			espresso.ability = 1
 		end
 	end
 	

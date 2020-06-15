@@ -14,7 +14,7 @@ inbox = require "inbox"
 game_status = {
 	action = "pause",
 	menu = "pause",
-	threshhold = 100,
+	threshhold = 144,
 	window_position = {
 		x = nil,
 		y = nil,
@@ -219,26 +219,32 @@ function love.update(dt)
 	
 	if game_status.action == "play" then
 		-- run the main game logic
-		if controls.quick_detect.up then
-			player.y = player.y - (player.medium_speed * dt)
-		elseif controls.quick_detect.down then
-			player.y = player.y + (player.medium_speed * dt)
-		elseif controls.quick_detect.left then
-			player.x = player.x - (player.medium_speed * dt)
-		elseif controls.quick_detect.right then
-			player.x = player.x + (player.medium_speed * dt)
-		end
-		
-		if player.x < 0 then
-			player.x = 0
-		elseif player.x + player.width > game_status.threshhold then
-			player.x = game_status.threshhold - player.width
-		end
-		
-		if player.y < 0 then
-			player.y = 0
-		elseif player.y + player.height > love.graphics.getHeight() then
-			player.y = love.graphics.getHeight() - player.height
+		if player.alive then
+			if controls.quick_detect.up < controls.quick_detect.down then
+				player.y = player.y - (player.medium_speed * dt)
+			elseif controls.quick_detect.down < controls.quick_detect.up then
+				player.y = player.y + (player.medium_speed * dt)
+			end
+			if controls.quick_detect.left < controls.quick_detect.right then
+				player.x = player.x - (player.medium_speed * dt)
+			elseif controls.quick_detect.right < controls.quick_detect.left then
+				player.x = player.x + (player.medium_speed * dt)
+			end
+			
+			if player.x < 0 then
+				player.x = 0
+			elseif player.x + player.width > game_status.threshhold then
+				player.x = game_status.threshhold - player.width
+			end
+			
+			if player.y < 0 then
+				player.y = 0
+			elseif player.y + player.height > love.graphics.getHeight() then
+				player.y = love.graphics.getHeight() - player.height
+			end
+		elseif not player.alive then
+			-- the player is dead
+			
 		end
 	elseif game_status.action == "pause" then
 		-- the game is paused
@@ -274,6 +280,12 @@ function love.draw()
 			love.graphics.setColor(240, 240, 240)
 			love.graphics.printf("REALLY QUIT?", 0, 240, love.graphics.getWidth(), "center")
 			love.graphics.printf("X TO QUIT", 0, 264, love.graphics.getWidth(), "center")
+		elseif game_status.menu == "debug" then
+			love.graphics.setColor(0, 24, 8)
+			love.graphics.rectangle("fill", love.graphics.getWidth() * 3/8, 175, love.graphics.getWidth() / 4, 150)
+			love.graphics.setColor(240, 240, 240)
+			love.graphics.printf("DEBUG", 0, 240, love.graphics.getWidth(), "center")
+			love.graphics.printf("kill Player - take Health - Give health - kill Enemies - console Info - Reset powerups - Full health - resurrecT player - console Debug", love.graphics.getWidth() * 3/8, 264, love.graphics.getWidth() / 4, "center")
 		end
 	end
 end
