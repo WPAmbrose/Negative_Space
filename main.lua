@@ -20,6 +20,7 @@ game_status = {
 		y = nil,
 		display = nil
 	},
+	debug_messages = true,
 	debug_text = nil
 }
 
@@ -144,6 +145,7 @@ function love.quit()
 		-- don't quit
 		game_status.input_type = nil
 		game_status.selected_item = 1
+		game_status.action = "pause"
 		game_status.menu = "quit_check"
 		return true
 	elseif game_status.menu == "quit_confirmed" then
@@ -172,7 +174,6 @@ function love.load(arg)
 	
 	-- prepare game data and spawn game objects
 	spawn.prepare_constant_data()
-	spawn.interface_fixed_data()
 	
 	-- reseed the random number generator
 	love.math.setRandomSeed((math.floor(tonumber(os.date("%d")) / 10) + 1) * (tonumber(os.date("%w")) + 1) * tonumber(os.date("%I")) * (tonumber(os.date("%M")) + 1) * (math.floor(tonumber(os.date("%S")) / 12) + 1))
@@ -188,7 +189,6 @@ function love.load(arg)
 	spawn.player(0, 235)
 	
 	player.form = "small"
-	game_status.action = "play"
 end
 
 function love.update(dt)
@@ -260,8 +260,20 @@ function love.draw()
 	
 	-- draw UI
 	
-	if game_status.action == "pause" or game_status.action == "quit" then
+	if game_status.action == "pause" then
 		-- draw more UI
-		
+		if game_status.menu == "pause" then
+			love.graphics.setColor(0, 24, 8)
+			love.graphics.rectangle("fill", love.graphics.getWidth() * 3/8, 175, love.graphics.getWidth() / 4, 150)
+			love.graphics.setColor(240, 240, 240)
+			love.graphics.printf("PAUSE", 0, 240, love.graphics.getWidth(), "center")
+			love.graphics.printf("X TO QUIT", 0, 264, love.graphics.getWidth(), "center")
+		elseif game_status.menu == "quit_check" then
+			love.graphics.setColor(0, 24, 8)
+			love.graphics.rectangle("fill", love.graphics.getWidth() * 3/8, 175, love.graphics.getWidth() / 4, 150)
+			love.graphics.setColor(240, 240, 240)
+			love.graphics.printf("REALLY QUIT?", 0, 240, love.graphics.getWidth(), "center")
+			love.graphics.printf("X TO QUIT", 0, 264, love.graphics.getWidth(), "center")
+		end
 	end
 end

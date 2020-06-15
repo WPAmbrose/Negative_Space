@@ -68,28 +68,23 @@ function inbox.chunky_input(pressed, input_device, keypress)
 		control_set = controls.cnt
 	end
 	
-	if game_status.menu == "none" then
+	if game_status.action == "play" then
 		-- the game is proceeding normally
 		if pressed == control_set.pause or pressed == "pause" then
 			-- pause the game
+			game_status.action = "pause"
 			game_status.menu = "pause"
 			if game_status.debug_messages then
 				print("Game paused")
 				game_status.debug_text = "Game paused"
 			end
-		elseif pressed == "q" and (love.keyboard.isDown("lalt") or love.keyboard.isDown("ralt")) then
-			-- the player is trying to do a guaranteed quit of the game
-			game_status.menu = "quit_check"
-			if game_status.debug_messages then
-				print("Entered quit confirmation dialog box")
-				game_status.debug_text = "Entered quit confirmation dialog box"
-			end
 		end
-	elseif game_status.menu == "pause" then
+	elseif game_status.action == "pause" then
 		-- the game is paused
 		if game_status.menu == "pause" then
 			if pressed == control_set.pause or pressed == "pause" then
 				-- unpause the game
+				game_status.action = "play"
 				game_status.menu = "none"
 				if game_status.debug_messages then
 					print("Game unpaused")
@@ -105,7 +100,7 @@ function inbox.chunky_input(pressed, input_device, keypress)
 			end
 		elseif game_status.menu == "quit_check" then
 			-- the player selected the quit option, ask if they're sure
-			if pressed == "backspace" or pressed == "b" then
+			if pressed == control_set.pause or pressed == "backspace" or pressed == "b" then
 				game_status.menu = "pause"
 			elseif pressed == "x" then
 				-- the player is trying to do a guaranteed quit of the game
@@ -113,6 +108,7 @@ function inbox.chunky_input(pressed, input_device, keypress)
 					print("Player quit the game")
 					game_status.debug_text = "Player quit the game"
 				end
+				game_status.menu = "quit_confirmed"
 				love.event.quit()
 			end
 		elseif game_status.menu == "debug" then
