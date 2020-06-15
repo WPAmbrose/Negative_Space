@@ -107,13 +107,10 @@ function spawn.enemy(type, width, height, origin_x, origin_y, horizontal_directi
 		y = origin_y,
 		width = width,
 		height = height,
-		facing = facing,
 		horizontal_direction = horizontal_direction,
 		vertical_direction = vertical_direction,
 		speed = speed,
 		health = starting_health,
-		hurt = hurt,
-		death_timer = death_timer,
 		attack = {
 			state = "ready",
 			cooldown = 0.175
@@ -141,15 +138,15 @@ function spawn.stars(type, lower, upper)
 	-- spawn a number of the given type of stars ranging from lower to upper
 	
 	-- do some setup
+	local target = nil
 	if type == "near" then
-		type = map.stars.near_stars
+		target = map.stars.near_stars
 	elseif type == "far" then
-		type = map.stars.far_stars
+		target = map.stars.far_stars
 	end
 	
 	-- select the active star group
-	local target = nil
-	for group_index, selected_group in pairs(type.groups) do
+	for group_index, selected_group in pairs(target.groups) do
 		if not stale then
 			target = selected_group
 		end
@@ -162,9 +159,27 @@ function spawn.stars(type, lower, upper)
 		local star_x = love.graphics.getWidth() - 1
 		local star_y = util.weighted_random(1, love.graphics.getHeight(), weight)
 		-- add a star
-		local quad_index = target.sprite_batch:add(type.quad, star_x, star_y)
+		local quad_index = 0
+		local star_type = love.math.random()
+		if type == "near" then
+			if star_type <= 0.334 then
+				star_type = "a"
+				quad_index = target.sprite_batch:add(map.stars.near_stars.quad_a, star_x, star_y)
+			elseif star_type > 0.333 and star_type <= 0.667 then
+				star_type = "b"
+				quad_index = target.sprite_batch:add(map.stars.near_stars.quad_b, star_x, star_y)
+			elseif star_type > 0.667 then
+				star_type = "c"
+				quad_index = target.sprite_batch:add(map.stars.near_stars.quad_c, star_x, star_y)
+			end
+		elseif type == "far" then
+			star_type = "none"
+			quad_index = target.sprite_batch:add(map.stars.far_stars.quad, star_x, star_y)
+		
+		end
 		local traits = {
 			index = quad_index,
+			star_type = star_type,
 			x = star_x,
 			y = star_y
 		}
@@ -208,15 +223,18 @@ function spawn.prepare_constant_data()
 	love.graphics.setDefaultFilter("nearest", "nearest")
 	
 	-- load the UI font
-	game_status.font = love.graphics.newFont("assets/DejaVuSans.ttf", 12)
+	game_status.menu_font = love.graphics.newFont("assets/DejaVuSans.ttf", 12)
+	game_status.interface_font = love.graphics.newFont("assets/DejaVuSans-Bold.ttf", 12)
 	
 	-- set up the background
 	map.stars.near_stars.image = love.graphics.newImage("assets/near-star.png")
-	map.stars.near_stars.quad = love.graphics.newQuad(0, 0, 2, 2, 2, 2)
+	map.stars.near_stars.quad_a = love.graphics.newQuad(2, 3, 3, 3, 19, 9)
+	map.stars.near_stars.quad_b = love.graphics.newQuad(7, 3, 5, 3, 19, 9)
+	map.stars.near_stars.quad_c = love.graphics.newQuad(14, 2, 3, 5, 19, 9)
 	table.insert(map.stars.near_stars.groups, {sprite_batch = love.graphics.newSpriteBatch(map.stars.near_stars.image), stale = false, alive = true, locations = {} } )
 	
 	map.stars.far_stars.image = love.graphics.newImage("assets/far-star.png")
-	map.stars.far_stars.quad = love.graphics.newQuad(0, 0, 1, 1, 1, 1)
+	map.stars.far_stars.quad = love.graphics.newQuad(0, 0, 2, 2, 2, 2)
 	table.insert(map.stars.far_stars.groups, {sprite_batch = love.graphics.newSpriteBatch(map.stars.far_stars.image), stale = false, alive = true, locations = {} } )
 	
 	-- set up player sprites

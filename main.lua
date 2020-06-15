@@ -15,6 +15,7 @@ game_status = {
 	action = nil,
 	menu = nil,
 	threshhold = 144,
+	points = 0,
 	window_position = {
 		x = nil,
 		y = nil,
@@ -199,18 +200,22 @@ function love.wheelmoved(x, y)
 	if y > 0 then
 		if player.form == "small" then
 			player.form = "medium"
-			player.y = player.y - (player.medium_height - player.small_height)
+			player.height = player.medium_height
+			player.y = player.y - ((player.medium_height - player.small_height) / 2)
 		elseif player.form == "medium" then
 			player.form = "large"
-			player.y = player.y - (player.large_height - player.medium_height)
+			player.height = player.large_height
+			player.y = player.y - ((player.large_height - player.medium_height) / 2)
 		end
 	elseif y < 0 then
 		if player.form == "large" then
 			player.form = "medium"
-			player.y = player.y + (player.large_height - player.medium_height)
+			player.height = player.medium_height
+			player.y = player.y + ((player.large_height - player.medium_height) / 2)
 		elseif player.form == "medium" then
 			player.form = "small"
-			player.y = player.y + (player.medium_height - player.small_height)
+			player.height = player.small_height
+			player.y = player.y + ((player.medium_height - player.small_height) / 2)
 		end
 	end
 end
@@ -336,6 +341,8 @@ function love.update(dt)
 	if game_status.menu == "none" then
 		-- run the main game logic
 		
+		local added_points = 0
+		
 		for enemy_index, selected_enemy in pairs(enemies.basic.locations) do
 			-- loop over enemies
 			
@@ -426,6 +433,8 @@ function love.update(dt)
 				selected_projectile.x = selected_projectile.x + (player.projectile_speed * dt)
 			end
 		end
+		
+		game_status.points = game_status.points + added_points
 		
 		-- manage explosions
 		for explosion_index, selected_explosion in pairs(map.explosions) do
@@ -528,20 +537,30 @@ function love.update(dt)
 		end
 		
 		-- spawn stars
-		spawn.stars("near", 1, 10)
-		spawn.stars("far", 1, 12)
+		spawn.stars("near", 1, 5)
+		spawn.stars("far", 1, 10)
 		
 		for type_index, selected_type in pairs(map.stars) do
+			local all_stale = true
 			for group_index, selected_group in pairs(selected_type.groups) do
 				-- iterate over groups of stars
 				for star_index, selected_star in pairs(selected_group.locations) do
 					-- move the stars in this group
 					selected_star.x = selected_star.x - selected_type.speed
-					selected_group.sprite_batch:set(selected_star.index, selected_type.quad, selected_star.x, selected_star.y)
-					
+					if selected_star.star_type == "none" then
+						selected_group.sprite_batch:set(selected_star.index, selected_type.quad, selected_star.x, selected_star.y)
+					elseif selected_star.star_type == "a" then
+						selected_group.sprite_batch:set(selected_star.index, selected_type.quad_a, selected_star.x, selected_star.y)
+					elseif selected_star.star_type == "b" then
+						selected_group.sprite_batch:set(selected_star.index, selected_type.quad_b, selected_star.x, selected_star.y)
+					elseif selected_star.star_type == "c" then
+						selected_group.sprite_batch:set(selected_star.index, selected_type.quad_c, selected_star.x, selected_star.y)
+					end
 					if selected_group.sprite_batch:getCount() > 950 then
 						-- this group is full, stop adding to it
 						selected_group.stale = true
+					elseif selected_group.sprite_batch:getCount() <= 950 then
+						all_stale = false
 					end
 					
 					if selected_star.x < 0 then
@@ -552,29 +571,10 @@ function love.update(dt)
 					end
 				end
 			end
-		end
-		
-		-- create new star groups if all existing groups are full
-		local all_stale = true
-		
-		for group_index, selected_group in pairs(map.stars.near_stars.groups) do
-			if not selected_group.stale then
-				all_stale = false
+			if all_stale then
+				-- create new star groups as all existing groups are full
+				spawn.star_group(selected_type)
 			end
-		end
-		
-		if all_stale then
-			spawn.star_group(map.stars.near_stars)
-		end
-		
-		for group_index, selected_group in pairs(map.stars.far_stars.groups) do
-			if not selected_group.stale then
-				all_stale = false
-			end
-		end
-		
-		if all_stale then
-			spawn.star_group(map.stars.far_stars)
 		end
 		
 		for type_index, selected_type in pairs(map.stars) do
@@ -645,24 +645,28 @@ function love.draw()
 	love.graphics.setColor(255, 255, 255)
 	
 	-- draw UI
+	love.graphics.setFont(game_status.interface_font)
+	love.graphics.setColor(32, 192, 16)
+	love.graphics.printf("POINTS: " .. tostring(game_status.points), 0, 12, love.graphics.getWidth(), "center")
 	
+	love.graphics.setFont(game_status.menu_font)
 	if game_status.menu == "pause" then
 		-- draw pause UI
 		love.graphics.setColor(4, 16, 8)
 		love.graphics.rectangle("fill", love.graphics.getWidth() * 3/8, 175, love.graphics.getWidth() / 4, 150)
-		love.graphics.setColor(240, 240, 240)
+		love.graphics.setColor(32, 192, 16)
 		love.graphics.printf("PAUSE", 0, 240, love.graphics.getWidth(), "center")
 		love.graphics.printf("X TO QUIT", 0, 264, love.graphics.getWidth(), "center")
 	elseif game_status.menu == "quit_check" then
 		love.graphics.setColor(4, 16, 8)
 		love.graphics.rectangle("fill", love.graphics.getWidth() * 3/8, 175, love.graphics.getWidth() / 4, 150)
-		love.graphics.setColor(240, 240, 240)
+		love.graphics.setColor(32, 192, 16)
 		love.graphics.printf("REALLY QUIT?", 0, 240, love.graphics.getWidth(), "center")
 		love.graphics.printf("X TO QUIT", 0, 264, love.graphics.getWidth(), "center")
 	elseif game_status.menu == "debug" then
 		love.graphics.setColor(4, 16, 8)
 		love.graphics.rectangle("fill", love.graphics.getWidth() * 3/8, 175, love.graphics.getWidth() / 4, 150)
-		love.graphics.setColor(240, 240, 240)
+		love.graphics.setColor(32, 192, 16)
 		love.graphics.printf("DEBUG", 0, 240, love.graphics.getWidth(), "center")
 		love.graphics.printf("kill Player - take Health - Give health - kill Enemies - console Info - Reset powerups - Full health - resurrecT player - console Debug", love.graphics.getWidth() * 3/8, 264, love.graphics.getWidth() / 4, "center")
 	end
