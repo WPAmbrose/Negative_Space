@@ -12,8 +12,8 @@ inbox = require "inbox"
 
 -- set up broad-ranging game data
 game_status = {
-	action = "pause",
-	menu = "pause",
+	action = nil,
+	menu = nil,
 	threshhold = 144,
 	window_position = {
 		x = nil,
@@ -35,7 +35,7 @@ player = {
 	max_health = 3,
 	hurt = false,
 	flinch_timer = 0,
-	spawn_timer = 3,
+	spawn_timer = 0,
 	flicker_timer = 0,
 	flicker_max = 0.070,
 	low_speed = 120,
@@ -138,15 +138,12 @@ glossary of named states and important variables and data points for controls:
 	controller: table -- holds various data and functions relating to the active controller
 ]]--
 
--- set up storage for menu data
-menu_data = {
-	pause = {},
-	controls = {},
-	sticks = {},
-	save = {},
-	quit = {},
-	touch = {},
-	template = {}
+enemies = {
+	timer = 8,
+	basic = {
+		sprite = nil,
+		locations = {}
+	}
 }
 
 function love.quit()
@@ -182,6 +179,7 @@ function love.focus(focused_on_game)
 	end
 end
 
+
 function love.load(arg)
 	-- this function is called when the game starts
 	
@@ -201,7 +199,11 @@ function love.load(arg)
 	spawn.player(0, 235)
 	
 	player.form = "small"
+	
+	game_status.menu = "pause"
+	game_status.action = "pause"
 end -- love.load
+
 
 function love.update(dt)
 	-- this function is called once per frame, contains game logic, and provides a delta-time variable
@@ -213,7 +215,7 @@ function love.update(dt)
 		-- the game window is being moved, pause the game for player safety and game state integrity
 		if game_status.action == "play" then
 			game_status.action = "pause"
-			if game_status.menu == "none" or game_status.menu == "pause" then
+			if game_status.menu == "none" then
 				game_status.menu = "pause"
 			end
 			game_status.input_type = nil
@@ -233,8 +235,54 @@ function love.update(dt)
 	-- set some convenience data to deal with controls
 	inbox.instant_press()
 	
-	if game_status.action == "play" then
+	if game_status.menu == "none" then
 		-- run the main game logic
+		
+		for enemy_index, selected_enemy in pairs(enemies.basic.locations) do
+			-- loop over enemies
+			
+			-- move enemies
+			if selected_enemy.direction == "left" then
+				selected_enemy.x = selected_enemy.x - selected_enemy.speed * dt
+			elseif selected_enemy.direction == "right" then
+				selected_enemy.x = selected_enemy.x + selected_enemy.speed * dt
+			elseif selected_enemy.direction == "up" then
+				selected_enemy.y = selected_enemy.y - selected_enemy.speed * dt
+			elseif selected_enemy.direction == "down" then
+				selected_enemy.y = selected_enemy.y + selected_enemy.speed * dt
+			end
+			
+			-- check for collisions with the player
+			if player.flinch_timer == 0 then
+				if shc.check_collision(player.x, player.y, player.width, player.height, selected_enemy.x, selected_enemy.y, selected_enemy.width, selected_enemy.height, "full") then
+					-- damage the player
+					player.health = player.health - 1
+					player.flinch_timer = 1
+				end
+			end
+			
+			-- check for enemies leaving the screen
+			if selected_enemy.x + selected_enemy.width < 0 or selected_enemy.x > love.graphics.getWidth() or selected_enemy.y + selected_enemy.height < 0 or selected_enemy.y > love.graphics.getHeight() then
+				-- the enemy is off the screen, despawn it
+				enemies.basic.locations[enemy_index] = nil
+			end
+			
+			-- check for player projectiles hitting an enemy
+			for projectile_index, selected_projectile in pairs(player.projectiles) do
+				if shc.check_collision(selected_projectile.x, selected_projectile.y, player.projectile_sprite:getWidth(), player.projectile_sprite:getHeight(), selected_enemy.x, selected_enemy.y, selected_enemy.width, selected_enemy.height, "full") then
+					-- the enemy was hit, despawn it
+					enemies.basic.locations[enemy_index] = nil
+					selected_projectile.x = -100
+				end
+			end
+		end
+		
+		if player.flinch_timer > 0 then
+			player.flinch_timer = player.flinch_timer - dt
+		elseif player.flinch_timer <= 0 then
+			player.flinch_timer = 0
+		end
+		
 		if player.alive then
 			if controls.quick_detect.up < controls.quick_detect.down then
 				player.y = player.y - (player.medium_speed * dt)
@@ -276,15 +324,35 @@ function love.update(dt)
 					selected_projectile.x = selected_projectile.x + (player.projectile_speed * dt)
 				end
 			end
+			
+			if player.health <= 0 then
+				player.spawn_timer = 3
+				player.alive = false
+			end
 		elseif not player.alive then
 			-- the player is dead
-			
+			player.spawn_timer = player.spawn_timer - dt
+			if player.spawn_timer <= 0 then
+				player.spawn_timer = 0
+				spawn.player(0, 235)
+			end
 		end
-	elseif game_status.action == "pause" then
+		
+		if enemies.timer > 0 then
+			enemies.timer = enemies.timer - dt
+		elseif enemies.timer <= 0 then
+			enemies.timer = 0
+			local rand_x = util.weighted_random(750, 950, 880)
+			local rand_y = util.weighted_random(50, 450, 250)
+			spawn.enemy("standard", 25, 25, rand_x, rand_y, "left", 100, 1)
+			enemies.timer = 4
+		end
+	elseif game_status.menu == "pause" then
 		-- the game is paused
 		
 	end
 end -- love.update
+
 
 function love.draw()
 	-- draw the background
@@ -295,6 +363,9 @@ function love.draw()
 	end
 	
 	-- draw enemies
+	for enemy_index, selected_enemy in pairs(enemies.basic.locations) do
+		love.graphics.draw(enemies.basic.sprite, selected_enemy.x, selected_enemy.y)
+	end
 	
 	-- draw projectiles
 	for projectile_index, selected_projectile in pairs(player.projectiles) do
@@ -303,26 +374,24 @@ function love.draw()
 	
 	-- draw UI
 	
-	if game_status.action == "pause" then
+	if game_status.menu == "pause" then
 		-- draw more UI
-		if game_status.menu == "pause" then
-			love.graphics.setColor(4, 16, 8)
-			love.graphics.rectangle("fill", love.graphics.getWidth() * 3/8, 175, love.graphics.getWidth() / 4, 150)
-			love.graphics.setColor(240, 240, 240)
-			love.graphics.printf("PAUSE", 0, 240, love.graphics.getWidth(), "center")
-			love.graphics.printf("X TO QUIT", 0, 264, love.graphics.getWidth(), "center")
-		elseif game_status.menu == "quit_check" then
-			love.graphics.setColor(4, 16, 8)
-			love.graphics.rectangle("fill", love.graphics.getWidth() * 3/8, 175, love.graphics.getWidth() / 4, 150)
-			love.graphics.setColor(240, 240, 240)
-			love.graphics.printf("REALLY QUIT?", 0, 240, love.graphics.getWidth(), "center")
-			love.graphics.printf("X TO QUIT", 0, 264, love.graphics.getWidth(), "center")
-		elseif game_status.menu == "debug" then
-			love.graphics.setColor(0, 24, 8)
-			love.graphics.rectangle("fill", love.graphics.getWidth() * 3/8, 175, love.graphics.getWidth() / 4, 150)
-			love.graphics.setColor(240, 240, 240)
-			love.graphics.printf("DEBUG", 0, 240, love.graphics.getWidth(), "center")
-			love.graphics.printf("kill Player - take Health - Give health - kill Enemies - console Info - Reset powerups - Full health - resurrecT player - console Debug", love.graphics.getWidth() * 3/8, 264, love.graphics.getWidth() / 4, "center")
-		end
+		love.graphics.setColor(4, 16, 8)
+		love.graphics.rectangle("fill", love.graphics.getWidth() * 3/8, 175, love.graphics.getWidth() / 4, 150)
+		love.graphics.setColor(240, 240, 240)
+		love.graphics.printf("PAUSE", 0, 240, love.graphics.getWidth(), "center")
+		love.graphics.printf("X TO QUIT", 0, 264, love.graphics.getWidth(), "center")
+	elseif game_status.menu == "quit_check" then
+		love.graphics.setColor(4, 16, 8)
+		love.graphics.rectangle("fill", love.graphics.getWidth() * 3/8, 175, love.graphics.getWidth() / 4, 150)
+		love.graphics.setColor(240, 240, 240)
+		love.graphics.printf("REALLY QUIT?", 0, 240, love.graphics.getWidth(), "center")
+		love.graphics.printf("X TO QUIT", 0, 264, love.graphics.getWidth(), "center")
+	elseif game_status.menu == "debug" then
+		love.graphics.setColor(4, 16, 8)
+		love.graphics.rectangle("fill", love.graphics.getWidth() * 3/8, 175, love.graphics.getWidth() / 4, 150)
+		love.graphics.setColor(240, 240, 240)
+		love.graphics.printf("DEBUG", 0, 240, love.graphics.getWidth(), "center")
+		love.graphics.printf("kill Player - take Health - Give health - kill Enemies - console Info - Reset powerups - Full health - resurrecT player - console Debug", love.graphics.getWidth() * 3/8, 264, love.graphics.getWidth() / 4, "center")
 	end
 end -- love.draw

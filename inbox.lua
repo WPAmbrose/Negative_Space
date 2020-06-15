@@ -68,103 +68,99 @@ function inbox.chunky_input(pressed, input_device, keypress)
 		control_set = controls.cnt
 	end
 	
-	if game_status.action == "play" then
+	if game_status.menu == "none" then
 		-- the game is proceeding normally
 		if pressed == control_set.pause or pressed == "pause" then
 			-- pause the game
-			game_status.action = "pause"
 			game_status.menu = "pause"
 			if game_status.debug_messages then
 				print("Game paused")
 				game_status.debug_text = "Game paused"
 			end
 		end
-	elseif game_status.action == "pause" then
+	elseif game_status.menu == "pause" then
 		-- the game is paused
-		if game_status.menu == "pause" then
-			if pressed == control_set.pause or pressed == "pause" then
-				-- unpause the game
-				game_status.action = "play"
-				game_status.menu = "none"
-				if game_status.debug_messages then
-					print("Game unpaused")
-					game_status.debug_text = "Game unpaused"
-				end
-			elseif pressed == "x" then
-				-- the player is trying to do a guaranteed quit of the game
-				game_status.menu = "quit_check"
-				if game_status.debug_messages then
-					print("Entered quit confirmation dialog box")
-					game_status.debug_text = "Entered quit confirmation dialog box"
-				end
-			elseif pressed == control_set.debug then
-				game_status.menu = "debug"
-				if game_status.debug_messages then
-					print("Entered debug mode")
-					game_status.debug_text = "Entered debug mode"
+		if pressed == control_set.pause or pressed == "pause" then
+			-- unpause the game
+			game_status.menu = "none"
+			if game_status.debug_messages then
+				print("Game unpaused")
+				game_status.debug_text = "Game unpaused"
+			end
+		elseif pressed == "x" then
+			-- the player is trying to do a guaranteed quit of the game
+			game_status.menu = "quit_check"
+			if game_status.debug_messages then
+				print("Entered quit confirmation dialog box")
+				game_status.debug_text = "Entered quit confirmation dialog box"
+			end
+		elseif pressed == control_set.debug then
+			game_status.menu = "debug"
+			if game_status.debug_messages then
+				print("Entered debug mode")
+				game_status.debug_text = "Entered debug mode"
+			end
+		end
+	elseif game_status.menu == "quit_check" then
+		-- the player selected the quit option, ask if they're sure
+		if pressed == control_set.pause or pressed == "backspace" or pressed == "b" then
+			game_status.menu = "pause"
+		elseif pressed == "x" then
+			-- the player is trying to do a guaranteed quit of the game
+			if game_status.debug_messages then
+				print("Player quit the game")
+				game_status.debug_text = "Player quit the game"
+			end
+			game_status.menu = "quit_confirmed"
+			love.event.quit()
+		end
+	elseif game_status.menu == "debug" then
+		-- debug mode is active, where the player can alter the game on a broad scale
+		if pressed == control_set.debug or pressed == control_set.pause or pressed == "b" then
+			game_status.menu = "pause"
+			if game_status.debug_messages then
+				print("Exited debug mode")
+				game_status.debug_text = "Exited debug mode"
+			end
+		elseif pressed == "p" then
+			player.alive = false
+		elseif pressed == "h" then
+			if player.health >= 1 then
+				player.health = player.health - 1
+			end
+		elseif pressed == "g" then
+			if player.health < player.max_health then
+				player.health = player.health + 1
+			end
+		elseif pressed == "e" then
+			-- kill all enemies
+			for enemy_type_index, selected_enemy_type in pairs(map.enemies) do
+				for enemy_index, selected_enemy in pairs(selected_enemy_type.locations) do
+					selected_enemy.health = 0
 				end
 			end
-		elseif game_status.menu == "quit_check" then
-			-- the player selected the quit option, ask if they're sure
-			if pressed == control_set.pause or pressed == "backspace" or pressed == "b" then
-				game_status.menu = "pause"
-			elseif pressed == "x" then
-				-- the player is trying to do a guaranteed quit of the game
-				if game_status.debug_messages then
-					print("Player quit the game")
-					game_status.debug_text = "Player quit the game"
-				end
-				game_status.menu = "quit_confirmed"
-				love.event.quit()
+		elseif pressed == "i" then
+			-- turn debug info on or off
+			if game_status.debug_stats then
+				game_status.debug_stats = false
+			elseif not game_status.debug_stats then
+				game_status.debug_stats = true
 			end
-		elseif game_status.menu == "debug" then
-			-- debug mode is active, where the player can alter the game on a broad scale
-			if pressed == control_set.debug or pressed == control_set.pause or pressed == "b" then
-				game_status.menu = "pause"
-				if game_status.debug_messages then
-					print("Exited debug mode")
-					game_status.debug_text = "Exited debug mode"
-				end
-			elseif pressed == "p" then
-				player.alive = false
-			elseif pressed == "h" then
-				if player.health >= 1 then
-					player.health = player.health - 1
-				end
-			elseif pressed == "g" then
-				if player.health < player.max_health then
-					player.health = player.health + 1
-				end
-			elseif pressed == "e" then
-				-- kill all enemies
-				for enemy_type_index, selected_enemy_type in pairs(map.enemies) do
-					for enemy_index, selected_enemy in pairs(selected_enemy_type.locations) do
-						selected_enemy.health = 0
-					end
-				end
-			elseif pressed == "i" then
-				-- turn debug info on or off
-				if game_status.debug_stats then
-					game_status.debug_stats = false
-				elseif not game_status.debug_stats then
-					game_status.debug_stats = true
-				end
-			elseif pressed == "r" then
-				-- reset the player's powerup state
-				
-			elseif pressed == "f" then
-				-- grant the player full health
-				player.health = player.max_health
-			elseif pressed == "t" then
-				-- resurrect the player (only effective when the player is dead but not despawned yet)
-				player.alive = true
-				player.health = 1
-				player.spawn_timer = 3
-			elseif pressed == "d" then
-				-- engage Lua's interactive debugger and tell the user what's going on
-				print("Interactive debugger launched, type \"cont\" and press Enter to resume the game")
-				debug.debug()
-			end
+		elseif pressed == "r" then
+			-- reset the player's powerup state
+			
+		elseif pressed == "f" then
+			-- grant the player full health
+			player.health = player.max_health
+		elseif pressed == "t" then
+			-- resurrect the player (only effective when the player is dead but not despawned yet)
+			player.alive = true
+			player.health = 1
+			player.spawn_timer = 3
+		elseif pressed == "d" then
+			-- engage Lua's interactive debugger and tell the user what's going on
+			print("Interactive debugger launched, type \"cont\" and press Enter to resume the game")
+			debug.debug()
 		end
 	end
 end -- inbox.chunky_input

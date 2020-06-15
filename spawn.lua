@@ -5,15 +5,9 @@ local spawn = {}
 function spawn.player(x, y)
 	-- spawns the player
 	
-	-- set or reset various traits
 	player.x = x
 	player.y = y
-	
-	game_status.scroll_x = scroll_x
-	game_status.scroll_y = scroll_y
-	
-	-- make the player alive
-	player.spawn_timer = 3
+	player.spawn_timer = 0
 	player.hurt = false
 	player.flinch_timer = 0
 	player.health = player.max_health
@@ -60,15 +54,14 @@ function spawn.enemy(type, width, height, origin_x, origin_y, direction, speed, 
 	-- starting_health indicates how many hit points of health the enemy has to begin with
 	
 	local type = type
-	local width = width or 20
-	local height = height or 48
-	local origin_x = origin_x or 0
-	local origin_y = origin_y or 0
-	local starting_health = starting_health or 3
+	local width = width or 25
+	local height = height or 25
+	local origin_x = origin_x
+	local origin_y = origin_y
 	local direction = direction or "random"
-	local speed = speed
+	local speed = speed or 100
+	local starting_health = starting_health or 1
 	
-	local home_structure = nil
 	local facing = nil
 	local movement_switch = nil
 	local hurt = false
@@ -76,22 +69,27 @@ function spawn.enemy(type, width, height, origin_x, origin_y, direction, speed, 
 	local death_timer = nil
 	
 	if direction == "random" then
-		-- pick left or right at random
-		if love.math.random() > 0.5 then
+		-- pick a direction at random
+		local pathway = love.math.random()
+		if pathway <= 0.25 then
+			direction = "up"
+			facing = "up"
+		elseif pathway > 0.25 and pathway <= 0.50 then
+			direction = "down"
+			facing = "down"
+		elseif pathway > 0.50 and pathway <= 0.75 then
 			direction = "left"
 			facing = "left"
-		else
+		elseif pathway > 0.75 and pathway <= 1.00 then
 			direction = "right"
 			facing = "right"
 		end
 	end
 	
+	print("spawned enemy at: " .. tostring(origin_x) .. ", " .. tostring(origin_y))
+	
 	-- set the traits of this enemy
 	local traits = {
-		left_sprite = left_sprite,
-		right_sprite = right_sprite,
-		left_dead_sprite = left_dead_sprite,
-		right_dead_sprite = right_dead_sprite,
 		x = origin_x,
 		y = origin_y,
 		width = width,
@@ -102,7 +100,6 @@ function spawn.enemy(type, width, height, origin_x, origin_y, direction, speed, 
 		movement_switch = movement_switch,
 		health = starting_health,
 		hurt = hurt,
-		flinch_timer = flinch_timer,
 		death_timer = death_timer,
 		attack = {
 			state = "ready",
@@ -110,12 +107,14 @@ function spawn.enemy(type, width, height, origin_x, origin_y, direction, speed, 
 			cooldown = 0.175,
 			hitbox = {
 				x = 0,
-				y = 0,
-				width = map.enemies[type].left_attack_sprite:getWidth(),
-				height = map.enemies[type].left_attack_sprite:getHeight()
+				y = 0
 			}
 		}
 	}
+	
+	if type == "standard" then
+		table.insert(enemies.basic.locations, traits)
+	end
 end -- spawn.enemy
 
 function spawn.health(target, origin_x, origin_y, type)
@@ -200,6 +199,7 @@ function spawn.prepare_constant_data()
 	player.projectile_sprite = love.graphics.newImage("assets/player-projectile.png")
 	
 	-- set up textures for enemies
+	enemies.basic.sprite = love.graphics.newImage("assets/basic-enemy.png")
 	
 	-- set up powerups
 	
@@ -207,7 +207,7 @@ function spawn.prepare_constant_data()
 	
 	-- load the sprite for the level exit
 	
-end -- spawn.asset_prepare
+end -- spawn.prepare_constant_data
 
 return spawn
 
