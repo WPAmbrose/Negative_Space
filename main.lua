@@ -46,8 +46,18 @@ player = {
 		small_sprite = nil,
 		medium_sprite = nil,
 		large_sprite = nil
-	}
+	},
+	projectile_speed = 200,
+	projectile_sprite = nil,
+	projectile_timer = 0,
+	projectiles = {}
 }
+
+player.projectiles[1] = { x = -100, y = 100 }
+player.projectiles[2] = { x = -100, y = 100 }
+player.projectiles[3] = { x = -100, y = 100 }
+player.projectiles[4] = { x = -100, y = 100 }
+player.projectiles[5] = { x = -100, y = 100 }
 
 -- set up data for game controls
 controls = {
@@ -160,7 +170,10 @@ function love.focus(focused_on_game)
 	
 	if not focused_on_game and game_status.menu == "none" then
 		-- pause the game if the player switches away from it and it's not already paused
-		game_status.menu = "pause"
+		game_status.action = "pause"
+		if game_status.menu == "none" or game_status.menu == "pause" then
+			game_status.menu = "pause"
+		end
 		game_status.selected_item = 1
 		if game_status.debug_messages then
 			print("Game paused")
@@ -178,7 +191,6 @@ function love.load(arg)
 	-- reseed the random number generator
 	love.math.setRandomSeed((math.floor(tonumber(os.date("%d")) / 10) + 1) * (tonumber(os.date("%w")) + 1) * tonumber(os.date("%I")) * (tonumber(os.date("%M")) + 1) * (math.floor(tonumber(os.date("%S")) / 12) + 1))
 	
-	player.appearance.small_sprite = love.graphics.newImage("assets/ship-small.png")
 	player.width = player.appearance.small_sprite:getWidth()
 	player.height = player.appearance.small_sprite:getHeight()
 	
@@ -189,18 +201,22 @@ function love.load(arg)
 	spawn.player(0, 235)
 	
 	player.form = "small"
-end
+end -- love.load
 
 function love.update(dt)
+	-- this function is called once per frame, contains game logic, and provides a delta-time variable
+	
 	-- check if the game window is being moved
 	local temp_window_position = {x = nil, y = nil, display = nil}
 	temp_window_position.x, temp_window_position.y, temp_window_position.display = love.window.getPosition()
 	if game_status.window_position.x ~= temp_window_position.x or game_status.window_position.y ~= temp_window_position.y or game_status.window_position.display ~= temp_window_position.display then
 		-- the game window is being moved, pause the game for player safety and game state integrity
-		if game_status.action == "pause" then
-			game_status.menu = "pause"
+		if game_status.action == "play" then
+			game_status.action = "pause"
+			if game_status.menu == "none" or game_status.menu == "pause" then
+				game_status.menu = "pause"
+			end
 			game_status.input_type = nil
-			game_status.selected_item = 1
 			game_status.window_position.x, game_status.window_position.y, game_status.window_position.display = love.window.getPosition()
 			if game_status.debug_messages then
 				print("Game paused")
@@ -236,11 +252,29 @@ function love.update(dt)
 			elseif player.x + player.width > game_status.threshhold then
 				player.x = game_status.threshhold - player.width
 			end
-			
 			if player.y < 0 then
 				player.y = 0
 			elseif player.y + player.height > love.graphics.getHeight() then
 				player.y = love.graphics.getHeight() - player.height
+			end
+			
+			if player.projectile_timer > 0 then
+				player.projectile_timer = player.projectile_timer - dt
+			elseif player.projectile_timer <= 0 then
+				player.projectile_timer = 0
+			end
+			
+			if controls.quick_detect.main_attack ~= 0 then
+				-- attack of the player (attack)
+				spawn.player_projectile(player.x + player.width, player.y + (player.height / 2))
+			end
+			
+			for projectile_index, selected_projectile in pairs(player.projectiles) do
+				if selected_projectile.x >= love.graphics.getWidth() then
+					selected_projectile.x = -100
+				elseif selected_projectile.x > 0 and selected_projectile.x < love.graphics.getWidth() then
+					selected_projectile.x = selected_projectile.x + (player.projectile_speed * dt)
+				end
 			end
 		elseif not player.alive then
 			-- the player is dead
@@ -250,7 +284,7 @@ function love.update(dt)
 		-- the game is paused
 		
 	end
-end
+end -- love.update
 
 function love.draw()
 	-- draw the background
@@ -263,19 +297,22 @@ function love.draw()
 	-- draw enemies
 	
 	-- draw projectiles
+	for projectile_index, selected_projectile in pairs(player.projectiles) do
+		love.graphics.draw(player.projectile_sprite, selected_projectile.x, selected_projectile.y)
+	end
 	
 	-- draw UI
 	
 	if game_status.action == "pause" then
 		-- draw more UI
 		if game_status.menu == "pause" then
-			love.graphics.setColor(0, 24, 8)
+			love.graphics.setColor(4, 16, 8)
 			love.graphics.rectangle("fill", love.graphics.getWidth() * 3/8, 175, love.graphics.getWidth() / 4, 150)
 			love.graphics.setColor(240, 240, 240)
 			love.graphics.printf("PAUSE", 0, 240, love.graphics.getWidth(), "center")
 			love.graphics.printf("X TO QUIT", 0, 264, love.graphics.getWidth(), "center")
 		elseif game_status.menu == "quit_check" then
-			love.graphics.setColor(0, 24, 8)
+			love.graphics.setColor(4, 16, 8)
 			love.graphics.rectangle("fill", love.graphics.getWidth() * 3/8, 175, love.graphics.getWidth() / 4, 150)
 			love.graphics.setColor(240, 240, 240)
 			love.graphics.printf("REALLY QUIT?", 0, 240, love.graphics.getWidth(), "center")
@@ -288,4 +325,4 @@ function love.draw()
 			love.graphics.printf("kill Player - take Health - Give health - kill Enemies - console Info - Reset powerups - Full health - resurrecT player - console Debug", love.graphics.getWidth() * 3/8, 264, love.graphics.getWidth() / 4, "center")
 		end
 	end
-end
+end -- love.draw

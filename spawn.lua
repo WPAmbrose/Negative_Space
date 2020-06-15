@@ -26,6 +26,29 @@ function spawn.player(x, y)
 	end
 end -- spawn.player
 
+function spawn.player_projectile(x, y)
+	-- create player-originated projectiles
+	
+	if player.projectile_timer == 0 then
+		for projectile_index, selected_projectile in pairs(player.projectiles) do
+			-- create a new projectile
+			if selected_projectile.x <= -99 then
+				selected_projectile.x = x
+				selected_projectile.y = y
+				player.projectile_timer = 0.800
+				
+				-- debugging help
+				if game_status.debug_messages then
+					print(string.format("Player projectile spawned at: %.3f, %.3f", selected_projectile.x, selected_projectile.y))
+					game_status.debug_text = string.format("Player projectile spawned at: %.3f, %.3f", selected_projectile.x, selected_projectile.y)
+				end
+				
+				break
+			end
+		end
+	end
+end -- spawn.player_projectile
+
 function spawn.enemy(type, width, height, origin_x, origin_y, direction, speed, starting_health)
 	-- place enemies of all kinds
 	
@@ -174,6 +197,7 @@ function spawn.prepare_constant_data()
 	player.appearance.small_sprite = love.graphics.newImage("assets/ship-small.png")
 	
 	-- set up player attacks
+	player.projectile_sprite = love.graphics.newImage("assets/player-projectile.png")
 	
 	-- set up textures for enemies
 	
