@@ -5,7 +5,7 @@ function love.conf(t)
 	t.window.width = 1000
 	t.window.height = 500
 	t.identity = "Negative Space"
-	t.console = true
+	t.console = false
 	t.modules.physics = false
 	t.modules.video = false
 	t.modules.thread = false

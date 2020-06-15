@@ -14,7 +14,8 @@ inbox = require "inbox"
 game_status = {
 	menu = nil,
 	threshhold = 144,
-	points = 0,
+	score = 0,
+	high_score = 0,
 	window_position = {
 		x = nil,
 		y = nil,
@@ -51,8 +52,8 @@ player = {
 		medium_sprite = nil,
 		large_sprite = nil
 	},
-	projectile_speed = 240,
-	slow_projectile_speed = 210,
+	small_projectile_speed = 240,
+	large_projectile_speed = 200,
 	small_projectile_sprite = nil,
 	large_projectile_sprite = nil,
 	projectile_timer = 0,
@@ -162,9 +163,9 @@ map = {
 }
 
 enemies = {
-	spawn_timer = 7,
+	spawn_timer = 5,
 	spawn_latch = 2.70,
-	attack_timer = 8.5,
+	attack_timer = 6.5,
 	attack_latch = 1.35,
 	weight_point = love.graphics.getHeight() / 2,
 	weight_wait = 12,
@@ -209,6 +210,7 @@ function love.mousepressed(x, y, button)
 end
 
 function love.wheelmoved(x, y)
+	-- handle moving the mouse's scroll wheel
 	if player.alive and not player.hurt then
 		if y > 0 then
 			if player.form == "small" then
@@ -341,6 +343,7 @@ function love.update(dt)
 		end
 	end
 	
+	-- deal with mouse clicks
 	if love.mouse.isDown(1) then
 		quick_detect.main_attack = -1
 	end
@@ -348,6 +351,7 @@ function love.update(dt)
 	if game_status.menu == "none" then
 		-- run the main game logic
 		
+		-- keep track of points
 		local added_points = 0
 		
 		for enemy_index, selected_enemy in pairs(enemies.basic.locations) do
@@ -474,7 +478,7 @@ function love.update(dt)
 			if selected_projectile.x >= love.graphics.getWidth() then
 				table.remove(player.small_projectiles, projectile_index)
 			elseif selected_projectile.x > 0 and selected_projectile.x < love.graphics.getWidth() then
-				selected_projectile.x = selected_projectile.x + (player.projectile_speed * dt)
+				selected_projectile.x = selected_projectile.x + (player.small_projectile_speed * dt)
 			end
 		end
 		
@@ -482,11 +486,15 @@ function love.update(dt)
 			if selected_projectile.x >= love.graphics.getWidth() then
 				table.remove(player.large_projectiles, projectile_index)
 			elseif selected_projectile.x > 0 and selected_projectile.x < love.graphics.getWidth() then
-				selected_projectile.x = selected_projectile.x + (player.slow_projectile_speed * dt)
+				selected_projectile.x = selected_projectile.x + (player.large_projectile_speed * dt)
 			end
 		end
 		
-		game_status.points = game_status.points + added_points
+		-- manage scoring
+		game_status.score = game_status.score + added_points
+		if game_status.score > game_status.high_score then
+			game_status.high_score = game_status.score
+		end
 		
 		-- manage explosions
 		for explosion_index, selected_explosion in pairs(map.explosions) do
@@ -583,7 +591,7 @@ function love.update(dt)
 				enemies.attack_latch = 1.35
 				enemies.weight_wait = 12
 				map.explosions = {}
-				game_status.points = 0
+				game_status.score = 0
 				player.small_projectiles = {}
 				player.large_projectiles = {}
 				player.lives = 3
@@ -744,7 +752,7 @@ function love.draw()
 		hearts = "      "
 	end
 	love.graphics.printf("HEALTH: " .. hearts .. "   LIVES: " .. tostring(player.lives), 0, 12, love.graphics.getWidth(), "center")
-	love.graphics.printf("POINTS: " .. tostring(game_status.points), 0, 26, love.graphics.getWidth(), "center")
+	love.graphics.printf("SCORE: " .. tostring(game_status.score) .. "   HIGH SCORE: " .. tostring(game_status.high_score), 0, 26, love.graphics.getWidth(), "center")
 	
 	love.graphics.setFont(game_status.menu_font)
 	if game_status.menu == "pause" then

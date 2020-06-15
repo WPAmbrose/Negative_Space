@@ -53,7 +53,6 @@ function spawn.enemy(type, width, height, origin_x, origin_y, horizontal_directi
 	local speed = speed or 100
 	local starting_health = starting_health or 1
 	
-	local movement_switch = nil
 	local hurt = false
 	local flinch_timer = nil
 	local death_timer = nil
@@ -198,11 +197,21 @@ function spawn.prepare_constant_data()
 	-- set up the background
 	map.stars.near_stars.image = love.graphics.newImage("assets/star.png")
 	map.stars.near_stars.quad = love.graphics.newQuad(0, 0, 2, 2, 2, 2)
-	table.insert(map.stars.near_stars.groups, {sprite_batch = love.graphics.newSpriteBatch(map.stars.near_stars.image), stale = false, alive = true, locations = {} } )
+	table.insert(map.stars.near_stars.groups, {
+		sprite_batch = love.graphics.newSpriteBatch(map.stars.near_stars.image),
+		stale = false,
+		alive = true,
+		locations = {}
+	} )
 	
 	map.stars.far_stars.image = love.graphics.newImage("assets/star.png")
 	map.stars.far_stars.quad = love.graphics.newQuad(0, 0, 2, 2, 2, 2)
-	table.insert(map.stars.far_stars.groups, {sprite_batch = love.graphics.newSpriteBatch(map.stars.far_stars.image), stale = false, alive = true, locations = {} } )
+	table.insert(map.stars.far_stars.groups, {
+		sprite_batch = love.graphics.newSpriteBatch(map.stars.far_stars.image),
+		stale = false,
+		alive = true,
+		locations = {}
+	} )
 	
 	-- set up player sprites
 	player.appearance.small_sprite = love.graphics.newImage("assets/ship-small.png")
@@ -226,5 +235,5 @@ end -- spawn.prepare_constant_data
 
 return spawn
 
--- this library copyright 2016-20 GV (WPA) and licensed only under Apache License Version 2.0
+-- this library copyright 2020 GV (WPA) and licensed only under Apache License Version 2.0
 -- cf https://www.apache.org/licenses/LICENSE-2.0
