@@ -172,6 +172,19 @@ function spawn.stars(type, lower, upper)
 	end
 end -- spawn.stars
 
+function spawn.explosion(x, y, starting_size, MAX)
+	-- spawn an expanding explosion graphic
+	
+	local traits = {
+		x = x,
+		y = y,
+		switch = "explode",
+		size = starting_size,
+		MAX_EXPLOSION = MAX
+	}
+	
+	table.insert(map.explosions, traits)
+end
 
 function spawn.prepare_constant_data()
 	-- set up data that will be needed throughout the game, mostly assets but also other unchanging data
@@ -208,6 +221,12 @@ function spawn.prepare_constant_data()
 	
 	-- set up player sprites
 	player.appearance.small_sprite = love.graphics.newImage("assets/ship-small.png")
+	player.appearance.medium_sprite = love.graphics.newImage("assets/ship-medium.png")
+	player.appearance.large_sprite = love.graphics.newImage("assets/ship-large.png")
+	
+	player.small_height = player.appearance.small_sprite:getHeight()
+	player.medium_height = player.appearance.medium_sprite:getHeight()
+	player.large_height = player.appearance.large_sprite:getHeight()
 	
 	-- set up player attacks
 	player.projectile_sprite = love.graphics.newImage("assets/player-projectile.png")

@@ -19,9 +19,7 @@ game_status = {
 		x = nil,
 		y = nil,
 		display = nil
-	},
-	debug_messages = true,
-	debug_text = nil
+	}
 }
 
 -- set up player data
@@ -31,6 +29,9 @@ player = {
 	width = 0,
 	height = 0,
 	form = "small",
+	small_height = 0,
+	medium_height = 0,
+	large_height = 0,
 	health = 3,
 	max_health = 3,
 	hurt = false,
@@ -143,7 +144,7 @@ map = {
 		near_stars = {
 			image = nil,
 			quad = nil,
-			speed = 3.2,
+			speed = 3.4,
 			groups = {}
 		},
 		far_stars = {
@@ -152,7 +153,8 @@ map = {
 			speed = 2,
 			groups = {}
 		}
-	}
+	},
+	explosions = {}
 }
 
 enemies = {
@@ -171,6 +173,48 @@ enemies = {
 	}
 }
 
+function love.focus(focused_on_game)
+	-- this function is called when the OS's focus is put on the game and when focus is taken away;
+	-- this includes minimizing and un-minimizing the game
+	
+	if not focused_on_game and game_status.menu == "none" then
+		-- pause the game if the player switches away from it and it's not already paused
+		game_status.action = "pause"
+		if game_status.menu == "none" or game_status.menu == "pause" then
+			game_status.menu = "pause"
+		end
+		game_status.selected_item = 1
+	end
+end
+
+function love.mousemoved(x, y, dx, dy)
+	if player.alive and game_status.menu == "none" then
+		-- move the player with the mouse as long as they're alive and the game isn't paused
+		player.x = player.x + (dx * 2/3)
+		player.y = player.y + (dy * 2/3)
+	end
+end
+
+function love.wheelmoved(x, y)
+	if y > 0 then
+		if player.form == "small" then
+			player.form = "medium"
+			player.y = player.y - (player.medium_height - player.small_height)
+		elseif player.form == "medium" then
+			player.form = "large"
+			player.y = player.y - (player.large_height - player.medium_height)
+		end
+	elseif y < 0 then
+		if player.form == "large" then
+			player.form = "medium"
+			player.y = player.y + (player.large_height - player.medium_height)
+		elseif player.form == "medium" then
+			player.form = "small"
+			player.y = player.y + (player.medium_height - player.small_height)
+		end
+	end
+end
+
 function love.quit()
 	-- deal with the player trying to quit the game
 	if game_status.menu ~= "quit_confirmed" then
@@ -183,24 +227,6 @@ function love.quit()
 	elseif game_status.menu == "quit_confirmed" then
 		-- completely quit the game
 		return false
-	end
-end
-
-function love.focus(focused_on_game)
-	-- this function is called when the OS's focus is put on the game and when focus is taken away;
-	-- this includes minimizing and un-minimizing the game
-	
-	if not focused_on_game and game_status.menu == "none" then
-		-- pause the game if the player switches away from it and it's not already paused
-		game_status.action = "pause"
-		if game_status.menu == "none" or game_status.menu == "pause" then
-			game_status.menu = "pause"
-		end
-		game_status.selected_item = 1
-		if game_status.debug_messages then
-			print("Game paused")
-			game_status.debug_text = "Game paused"
-		end
 	end
 end
 
@@ -221,9 +247,12 @@ function love.load(arg)
 	
 	game_status.debug_text = "Welcome to Negative Space!"
 	
+	love.mouse.setRelativeMode(true)
+	
 	spawn.player(0, 235)
 	
 	player.form = "small"
+	player.height = player.small_height
 	
 	game_status.menu = "pause"
 	game_status.action = "pause"
@@ -245,10 +274,6 @@ function love.update(dt)
 			end
 			game_status.input_type = nil
 			game_status.window_position.x, game_status.window_position.y, game_status.window_position.display = love.window.getPosition()
-			if game_status.debug_messages then
-				print("Game paused")
-				game_status.debug_text = "Game paused"
-			end
 		end
 	end
 	
@@ -304,6 +329,10 @@ function love.update(dt)
 		end
 	end
 	
+	if love.mouse.isDown(1) then
+		quick_detect.main_attack = -1
+	end
+	
 	if game_status.menu == "none" then
 		-- run the main game logic
 		
@@ -350,6 +379,7 @@ function love.update(dt)
 					enemies.basic.locations[enemy_index] = enemies.basic.locations[#enemies.basic.locations]
 					enemies.basic.locations[#enemies.basic.locations] = nil
 					player.projectile_timer = 0
+					spawn.explosion(selected_projectile.x + player.projectile_sprite:getWidth(), selected_projectile.y + (player.projectile_sprite:getHeight() / 2), 7, 17)
 					selected_projectile.x = -100
 				end
 			end
@@ -377,6 +407,7 @@ function love.update(dt)
 					-- the player hit an enemy projectile with their own, remove both
 					table.remove(enemies.basic.projectiles.locations, projectile_index)
 					player.projectile_timer = 0
+					spawn.explosion(selected_player_projectile.x + player.projectile_sprite:getWidth(), selected_player_projectile.y + (player.projectile_sprite:getHeight() / 2), 4, 11)
 					selected_player_projectile.x = -100
 				end
 			end
@@ -393,6 +424,21 @@ function love.update(dt)
 				selected_projectile.x = -100
 			elseif selected_projectile.x > 0 and selected_projectile.x < love.graphics.getWidth() then
 				selected_projectile.x = selected_projectile.x + (player.projectile_speed * dt)
+			end
+		end
+		
+		-- manage explosions
+		for explosion_index, selected_explosion in pairs(map.explosions) do
+			if selected_explosion.switch == "explode" then
+				selected_explosion.size = selected_explosion.size + (dt * 20)
+				if selected_explosion.size > selected_explosion.MAX_EXPLOSION then
+					selected_explosion.switch = "implode"
+				end
+			elseif selected_explosion.switch == "implode" then
+				selected_explosion.size = selected_explosion.size - (dt * 20)
+				if selected_explosion.size <= 2 then
+					table.remove(map.explosions, explosion_index)
+				end
 			end
 		end
 		
@@ -553,7 +599,7 @@ function love.draw()
 		end
 	end
 	
-	-- draw the player
+	-- manage stun flickering
 	if player.hurt then
 		if player.flicker_timer <= 0 then
 			player.flicker_timer = player.flicker_max
@@ -566,8 +612,14 @@ function love.draw()
 			love.graphics.setColor(255, 255, 255, 0)
 		end
 	end
+	
+	-- draw the player
 	if player.form == "small" then
 		love.graphics.draw(player.appearance.small_sprite, player.x, player.y)
+	elseif player.form == "medium" then
+		love.graphics.draw(player.appearance.medium_sprite, player.x, player.y)
+	elseif player.form == "large" then
+		love.graphics.draw(player.appearance.large_sprite, player.x, player.y)
 	end
 	love.graphics.setColor(255, 255, 255, 255)
 	
@@ -585,10 +637,17 @@ function love.draw()
 		love.graphics.draw(player.projectile_sprite, selected_projectile.x, selected_projectile.y)
 	end
 	
+	-- show explosions
+	love.graphics.setColor(4, 16, 8)
+	for explosion_index, selected_explosion in pairs(map.explosions) do
+		love.graphics.circle("fill", selected_explosion.x, selected_explosion.y, selected_explosion.size)
+	end
+	love.graphics.setColor(255, 255, 255)
+	
 	-- draw UI
 	
 	if game_status.menu == "pause" then
-		-- draw more UI
+		-- draw pause UI
 		love.graphics.setColor(4, 16, 8)
 		love.graphics.rectangle("fill", love.graphics.getWidth() * 3/8, 175, love.graphics.getWidth() / 4, 150)
 		love.graphics.setColor(240, 240, 240)
