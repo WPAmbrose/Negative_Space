@@ -1,5 +1,5 @@
 # Negative Space
-This is a game made in a month for an unofficial game jam by the Pixeland community, with the restriction that only 3 colors could be used. The code is licensed under Apache and the art under Creative Commons, with more details in code files and the assets directory.
+This is a game made in a month for an unofficial game jam by the Pixeland community, with the restriction that only 3 colors could be used. The code is licensed under Apache and the art under Creative Commons, with more details in code files and the assets directory. The game runs with the Love2D framework, found at https://love2d.org/
 
 # Controls
 Keyboard:
@@ -22,7 +22,7 @@ Mouse:
 * scroll wheel to change forms
 
 # Story
-The year is 2090. Humanity has been invaded by cyborg aliens. The war turns sour, but then we discover how to reverse-engineer their technology. Using it throws human perception into reverse- black becomes white, inside becomes outside, and the cold colorless technology of the aliens appears to teem with life and a more vibrant color than any other. Your mission is to use a hybrid of human and alien technology to strike down the invaders for as long as you can.
+The year is 2090. Humanity has been invaded by cyborg aliens. The war turns sour, but then we discover how to reverse-engineer their technology. Using it throws human perception into reverse-- black becomes white, inside becomes outside, and the cold colorless technology of the aliens appears to teem with life and a more vibrant color than any other. Your mission is to use a hybrid of human and alien technology to strike down the invaders for as long as you can.
 
 Be careful, as only three strikes from alien attackers can render your ship inoperable, and the reverse-engineered technology can only be repaired three times before disintegrating.
 
